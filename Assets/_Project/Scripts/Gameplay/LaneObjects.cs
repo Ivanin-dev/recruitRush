@@ -131,14 +131,14 @@ namespace RecruitRush
                     helmet = RunnerHelmet;
                     break;
                 case EnemyKind.Heavy: // slow and armored: needs damage per bullet, not bullet count
-                    hp *= 6f;
+                    hp *= 5f;
                     runSpeed = Mathf.Max(0.5f, runSpeed - 1.2f);
                     scale = 1.45f;
                     uniform = HeavyUniform;
                     helmet = HeavyHelmet;
-                    e.armor = 1.5f;
+                    e.armor = 0.8f;
                     e.breachCost = 4;
-                    e.halfWidth = 0.55f;
+                    e.halfWidth = 0.75f;
                     e.hitHeight = 0.7f;
                     break;
                 case EnemyKind.Rifleman:
@@ -243,7 +243,7 @@ namespace RecruitRush
         {
             if (!Alive) return;
             // Armor soaks a flat amount per bullet: weak guns barely scratch heavies.
-            float dealt = armor > 0f ? Mathf.Max(damage - armor, damage * 0.15f) : damage;
+            float dealt = armor > 0f ? Mathf.Max(damage - armor, damage * 0.35f) : damage;
             hp -= dealt;
             if (hpLabel) hpLabel.text = Mathf.Max(0, Mathf.CeilToInt(hp)).ToString();
             Vector3 chest = transform.position + Vector3.up * (0.5f * transform.localScale.y) + Vector3.back * 0.2f;

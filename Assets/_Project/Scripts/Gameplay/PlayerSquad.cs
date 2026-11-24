@@ -24,6 +24,8 @@ namespace RecruitRush
         public static readonly Color CommanderHelmet = new(0.9f, 0.72f, 0.2f);
         /// <summary>The commander fires faster and harder than a soldier, so a lone start is playable.</summary>
         public const float CommanderDamageMul = 3f, CommanderRateMul = 2f;
+        /// <summary>How far to either side of its line a soldier will engage a target (meters).</summary>
+        public const float AimSector = 1.6f;
 
         public int Count { get; private set; }
         public int Tier { get; private set; }
@@ -234,11 +236,13 @@ namespace RecruitRush
         void FireOne(Vector3 muzzle, float damage, Color color, bool flash)
         {
             if (flash) Fx.Muzzle(muzzle, color);
-            var target = Target.FindAhead(muzzle.x, muzzle.z, range);
+            var target = Target.FindInSector(muzzle.x, muzzle.z, range, AimSector);
             Vector3 end;
             if (target)
             {
-                end = new Vector3(muzzle.x, target.hitHeight, target.FrontZ);
+                // Aim at the nearest point of the target's body, so diagonal tracers visibly connect.
+                float tx = Mathf.Clamp(muzzle.x, target.transform.position.x - target.halfWidth, target.transform.position.x + target.halfWidth);
+                end = new Vector3(tx, target.hitHeight, target.FrontZ);
                 target.TakeHit(damage);
             }
             else end = muzzle + Vector3.forward * range;

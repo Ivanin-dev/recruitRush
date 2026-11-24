@@ -247,7 +247,7 @@ namespace RecruitRush
 
             // HP: the wave as a whole should soak "pressure × DPS × duration".
             float weight = 0f;
-            foreach (var o in orders) weight += o.kind == EnemyKind.Heavy ? 6f : o.kind == EnemyKind.Runner ? 0.6f : o.kind == EnemyKind.Rifleman ? 2f : 1f;
+            foreach (var o in orders) weight += o.kind == EnemyKind.Heavy ? 5f : o.kind == EnemyKind.Runner ? 0.6f : o.kind == EnemyKind.Rifleman ? 2f : 1f;
             float duration = s.end - s.start;
             waveHp = Mathf.Max(Config.EnemyHpAt(t), s.pressure * SquadDps * duration / Mathf.Max(1f, weight));
 

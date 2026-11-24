@@ -22,6 +22,33 @@ namespace RecruitRush
 
         public abstract void TakeHit(float damage);
 
+        /// <summary>
+        /// Best target in a forward sector: anything whose body lies within <paramref name="sector"/> meters of the
+        /// shooter's line. Prefers what's closest, with sideways distance weighted extra so soldiers still mostly fire ahead.
+        /// </summary>
+        public static Target FindInSector(float x, float z, float range, float sector)
+        {
+            Target best = null;
+            float bestScore = float.MaxValue;
+            for (int i = 0; i < All.Count; i++)
+            {
+                var t = All[i];
+                if (!t.Alive) continue;
+                Vector3 p = t.transform.position;
+                float dz = p.z - t.depth - z;
+                if (dz < -0.5f || dz > range) continue;
+                float side = Mathf.Max(0f, Mathf.Abs(p.x - x) - t.halfWidth);
+                if (side > sector) continue;
+                float score = dz + side * 3f;
+                if (score < bestScore)
+                {
+                    bestScore = score;
+                    best = t;
+                }
+            }
+            return best;
+        }
+
         /// <summary>Nearest living target straight ahead of (x, z) within range.</summary>
         public static Target FindAhead(float x, float z, float range)
         {
