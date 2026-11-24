@@ -77,6 +77,19 @@ namespace RecruitRush
             CountChanged?.Invoke(n);
         }
 
+        /// <summary>Total damage per second the squad puts out (soldiers + commander), used to size enemy waves.</summary>
+        public float Dps
+        {
+            get
+            {
+                if (Count <= 0) return 0f;
+                float perBullet = Weapons.Damage[Tier] * DamageMul;
+                float soldiers = Mathf.Max(0, Count - 1) * Weapons.FireRate * FireRateMul * perBullet;
+                float commander = Weapons.FireRate * CommanderRateMul * FireRateMul * perBullet * CommanderDamageMul;
+                return soldiers + commander;
+            }
+        }
+
         public void AddDamage(float amount)
         {
             DamageMul += amount;

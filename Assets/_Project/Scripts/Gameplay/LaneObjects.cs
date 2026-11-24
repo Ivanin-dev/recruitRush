@@ -85,6 +85,18 @@ namespace RecruitRush
         static readonly Color ArmorPing = new(0.75f, 0.85f, 1f);
 
         public EnemyKind Kind { get; private set; }
+
+        /// <summary>Living enemies on the field (used to cap how many are active at once).</summary>
+        public static int LivingCount
+        {
+            get
+            {
+                int n = 0;
+                foreach (var t in All)
+                    if (t is Enemy && t.Alive) n++;
+                return n;
+            }
+        }
         float armor;
         int breachCost = 1;
         TextMesh hpLabel;
@@ -125,7 +137,7 @@ namespace RecruitRush
                     uniform = HeavyUniform;
                     helmet = HeavyHelmet;
                     e.armor = 1.5f;
-                    e.breachCost = 3;
+                    e.breachCost = 4;
                     e.halfWidth = 0.55f;
                     e.hitHeight = 0.7f;
                     break;
@@ -194,7 +206,8 @@ namespace RecruitRush
             {
                 // Dug in: shoot a soldier every so often until killed.
                 fireTimer += dt;
-                if (fireTimer >= 1.6f && squad.Count > 1)
+                // Covers only its own sector: side-stepping out of its line of fire is a valid answer.
+                if (fireTimer >= 1.6f && squad.Count > 1 && Mathf.Abs(sp.x - p.x) < 4.5f)
                 {
                     fireTimer = 0f;
                     Vector3 muzzle = p + Vector3.up * 0.5f + Vector3.back * 0.3f;
