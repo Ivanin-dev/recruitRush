@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace RecruitRush
 {
-    /// <summary>The player's crowd: moves forward, steers sideways, grows/shrinks, holds the weapon tier.</summary>
+    /// <summary>The player's crowd at the bottom of the screen: steers sideways, auto-fires forward.</summary>
     public class PlayerSquad : MonoBehaviour
     {
         class Unit
@@ -13,34 +13,36 @@ namespace RecruitRush
             public float phase;
         }
 
-        public float forwardSpeed = 9f;
         public float baseSpacing = 0.42f;
-        public int maxVisible = 160;
-        public float roadHalfWidth = 4f;
+        public int maxVisible = 150;
+        public float roadHalfWidth = 4.5f;
+        public float range = 26f;
 
         public static readonly Color UniformColor = new(0.36f, 0.45f, 0.25f);
         public static readonly Color HelmetColor = new(0.26f, 0.33f, 0.18f);
 
         public int Count { get; private set; }
         public int Tier { get; private set; }
-        public bool Moving { get; set; }
-        public bool Engaged { get; set; }
-        public Vector3? AimPoint { get; set; }
+        public float FireRateMul { get; private set; } = 1f;
+        public float DamageMul { get; private set; } = 1f;
+        public bool Firing { get; set; }
         public int VisibleCount => units.Count;
+        public float TargetX => targetX;
         public event System.Action<int> CountChanged;
-        public event System.Action<int> TierChanged;
+        public event System.Action StatsChanged;
 
         readonly List<Unit> units = new();
         Transform unitsRoot, badge;
         TextMesh badgeText;
-        float targetX;
+        Tracers tracers;
+        float targetX, shotAcc;
 
         float Spacing => Formation.Spacing(units.Count, baseSpacing);
         public float Radius => Formation.Radius(units.Count, Spacing);
-        public float FrontZ => transform.position.z + Radius;
 
-        public void Init(int count, int tier)
+        public void Init(int count, Tracers tracerPool)
         {
+            tracers = tracerPool;
             unitsRoot = new GameObject("PlayerUnits").transform;
             unitsRoot.SetParent(transform.parent, false);
 
@@ -51,12 +53,12 @@ namespace RecruitRush
                 Art.Lit(new Color(0.15f, 0.38f, 0.8f)), null, false);
             badgeText = Art.Text("BadgeText", badge, new Vector3(0f, 0f, -0.03f), "0", 0.5f, Color.white);
 
-            Tier = Mathf.Clamp(tier, 0, Weapons.MaxTier);
             SetCount(count, transform.position);
         }
 
         public void Steer(float dx) => targetX += dx;
         public void SetTargetX(float x) => targetX = x;
+        public void Add(int n) => SetCount(Count + n, transform.position);
 
         public void SetCount(int n, Vector3 hitFrom)
         {
@@ -67,28 +69,30 @@ namespace RecruitRush
             while (units.Count < want) SpawnUnit();
             while (units.Count > want) KillUnit(units.Count - 1, hitFrom);
             if (badgeText) badgeText.text = n.ToString();
-            if (badge && grew) Pop.Play(badge, 1.3f);
+            if (badge && grew) Pop.Play(badge, 1.2f);
             CountChanged?.Invoke(n);
         }
 
-        public void SetTier(int tier)
+        public void Upgrade(UpgradeType type)
         {
-            tier = Mathf.Clamp(tier, 0, Weapons.MaxTier);
-            if (tier == Tier) return;
-            Tier = tier;
-            foreach (var u in units)
+            switch (type)
             {
-                ApplyGun(u);
-                Pop.Play(u.root, 0.7f);
+                case UpgradeType.Weapon:
+                    if (Tier < Weapons.MaxTier)
+                    {
+                        Tier++;
+                        foreach (var u in units)
+                        {
+                            ApplyGun(u);
+                            Pop.Play(u.root, 0.7f);
+                        }
+                    }
+                    else FireRateMul += Upgrades.FireRateStep;
+                    break;
+                case UpgradeType.FireRate: FireRateMul += Upgrades.FireRateStep; break;
+                case UpgradeType.Damage: DamageMul += Upgrades.DamageStep; break;
             }
-            TierChanged?.Invoke(tier);
-        }
-
-        public Vector3 RandomMuzzle()
-        {
-            if (units.Count == 0) return transform.position + Vector3.up * 0.5f;
-            var u = units[Random.Range(0, units.Count)];
-            return u.root.TransformPoint(Weapons.GunPos[Tier] + new Vector3(0f, 0f, Weapons.GunScale[Tier].z * 0.5f));
+            StatsChanged?.Invoke();
         }
 
         void SpawnUnit()
@@ -120,19 +124,15 @@ namespace RecruitRush
         {
             float dt = Time.deltaTime;
             Vector3 p = transform.position;
-            bool running = Moving && !Engaged;
-            if (running) p.z += forwardSpeed * dt;
-
-            // Keep the crowd on the road, but always allow enough offset to pick a side.
-            float limit = Mathf.Max(0.6f, roadHalfWidth - Radius);
+            float limit = Mathf.Max(0f, roadHalfWidth - Radius);
             targetX = Mathf.Clamp(targetX, -limit, limit);
             p.x = Mathf.Lerp(p.x, targetX, 1f - Mathf.Exp(-14f * dt));
             transform.position = p;
 
-            float follow = 1f - Mathf.Exp(-10f * dt);
-            float turn = 1f - Mathf.Exp(-12f * dt);
+            float follow = 1f - Mathf.Exp(-12f * dt);
             float time = Time.time;
             float spacing = Spacing;
+            bool running = Firing;
             for (int i = 0; i < units.Count; i++)
             {
                 var u = units[i];
@@ -140,16 +140,41 @@ namespace RecruitRush
                 Vector3 cur = u.root.position;
                 cur.y = 0f;
                 Vector3 np = Vector3.Lerp(cur, target, follow);
-                float bob = running ? Mathf.Abs(Mathf.Sin(time * 13f + u.phase)) * 0.09f : 0f;
-                u.root.position = new Vector3(np.x, bob, np.z);
-
-                Vector3 look = AimPoint.HasValue ? AimPoint.Value - np : Vector3.forward;
-                look.y = 0f;
-                if (look.sqrMagnitude > 0.0001f)
-                    u.root.rotation = Quaternion.Slerp(u.root.rotation, Quaternion.LookRotation(look), turn);
+                float bob = running ? Mathf.Abs(Mathf.Sin(time * 13f + u.phase)) * 0.08f : 0f;
+                u.root.SetPositionAndRotation(new Vector3(np.x, bob, np.z), Quaternion.identity);
             }
 
             if (badge) badge.localPosition = new Vector3(0f, 1.5f + Radius * 0.15f, 0f);
+            if (Firing) Shoot(dt);
+        }
+
+        void Shoot(float dt)
+        {
+            if (units.Count == 0 || tracers == null) return;
+            shotAcc += units.Count * Weapons.FireRate * FireRateMul * dt;
+            int shots = Mathf.FloorToInt(shotAcc);
+            shotAcc -= shots;
+            shots = Mathf.Min(shots, 40);
+
+            // Soldiers beyond the visible cap still contribute damage.
+            float damage = Weapons.Damage[Tier] * DamageMul * (Count / (float)units.Count);
+            Color color = Weapons.TracerColor[Tier];
+            Vector3 muzzleLocal = Weapons.GunPos[Tier] + new Vector3(0f, 0f, Weapons.GunScale[Tier].z * 0.5f);
+
+            for (int s = 0; s < shots; s++)
+            {
+                var u = units[Random.Range(0, units.Count)];
+                Vector3 m = u.root.TransformPoint(muzzleLocal);
+                var target = Target.FindAhead(m.x, m.z, range);
+                Vector3 end;
+                if (target)
+                {
+                    end = new Vector3(m.x, target.hitHeight, target.FrontZ);
+                    target.TakeHit(damage);
+                }
+                else end = m + Vector3.forward * range;
+                tracers.Fire(m, end, color);
+            }
         }
     }
 }

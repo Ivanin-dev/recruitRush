@@ -8,10 +8,12 @@ namespace RecruitRush
     /// <summary>Portrait HUD and result screen (uGUI, built in code for the prototype).</summary>
     public class GameUI : MonoBehaviour
     {
-        Text levelText, coinsText, weaponText, hintText, resultTitle, resultDetails, resultButtonLabel;
+        Text levelText, coinsText, weaponText, hintText, bannerText, resultTitle, resultDetails, resultButtonLabel;
         GameObject resultPanel;
-        RectTransform card;
+        RectTransform card, progressFill;
+        Image progressFillImage;
         Button resultButton;
+        float bannerTime;
 
         public static GameUI Create()
         {
@@ -45,6 +47,16 @@ namespace RecruitRush
             weaponText = MakeText(safe, "Weapon", new Vector2(0f, 1f), new Vector2(40f, -140f), new Vector2(700f, 70f), 44, TextAnchor.UpperLeft);
             coinsText = MakeText(safe, "Coins", new Vector2(1f, 1f), new Vector2(-40f, -60f), new Vector2(500f, 90f), 58, TextAnchor.UpperRight);
             hintText = MakeText(safe, "Hint", new Vector2(0.5f, 0.2f), Vector2.zero, new Vector2(1000f, 120f), 66, TextAnchor.MiddleCenter);
+            bannerText = MakeText(safe, "Banner", new Vector2(0.5f, 0.68f), Vector2.zero, new Vector2(1000f, 140f), 84, TextAnchor.MiddleCenter);
+            bannerText.gameObject.SetActive(false);
+
+            var bar = MakeRect(safe, "Progress", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
+            bar.anchoredPosition = new Vector2(0f, -215f);
+            bar.sizeDelta = new Vector2(700f, 26f);
+            bar.gameObject.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.45f);
+            progressFill = MakeRect(bar, "Fill", Vector2.zero, new Vector2(0f, 1f));
+            progressFillImage = progressFill.gameObject.AddComponent<Image>();
+            progressFillImage.color = new Color(0.45f, 0.85f, 0.35f);
 
             resultPanel = MakeRect(root, "Result", Vector2.zero, Vector2.one).gameObject;
             resultPanel.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.6f);
@@ -105,7 +117,23 @@ namespace RecruitRush
 
         public void SetLevel(int level) => levelText.text = "LEVEL " + level;
         public void SetCoins(int coins) => coinsText.text = coins + " ¢";
-        public void SetWeapon(int tier) => weaponText.text = "WEAPON: " + Weapons.Names[tier];
+        public void SetStats(PlayerSquad squad) =>
+            weaponText.text = $"{Weapons.Names[squad.Tier]}   RATE x{squad.FireRateMul:0.##}   DMG x{squad.DamageMul:0.##}";
+
+        public void SetProgress(float t01, bool final)
+        {
+            progressFill.anchorMax = new Vector2(final ? 1f : t01, 1f);
+            progressFillImage.color = final ? new Color(0.95f, 0.3f, 0.25f) : new Color(0.45f, 0.85f, 0.35f);
+        }
+
+        public void ShowBanner(string text, Color color)
+        {
+            bannerText.text = text;
+            bannerText.color = color;
+            bannerText.gameObject.SetActive(true);
+            bannerTime = 1.6f;
+            Pop.Play(bannerText.transform, 0.4f);
+        }
 
         public void ShowHint(string text)
         {
@@ -131,6 +159,11 @@ namespace RecruitRush
         {
             if (hintText.gameObject.activeSelf)
                 hintText.transform.localScale = Vector3.one * (1f + Mathf.Sin(Time.unscaledTime * 4f) * 0.05f);
+            if (bannerTime > 0f)
+            {
+                bannerTime -= Time.unscaledDeltaTime;
+                if (bannerTime <= 0f) bannerText.gameObject.SetActive(false);
+            }
         }
     }
 

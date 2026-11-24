@@ -4,15 +4,15 @@ using UnityEngine;
 namespace RecruitRush
 {
     /// <summary>
-    /// Test bot, enabled only with the "-autoplay" command-line flag: plays one level picking the
-    /// better gate each time, logs the result and saves screenshots to "-shotdir".
+    /// Test bot, enabled only in development builds with "-autoplay": collects +1s, shoots crates when
+    /// they come into range, fights enemies that get close, logs the outcome and saves screenshots to "-shotdir".
     /// </summary>
     public class AutoPilot : MonoBehaviour
     {
         GameManager gm;
         string dir;
-        float t, battleT, clashT = -1f, endT = -1f;
-        bool shotRun, shotClash, shotBattle, shotEnd;
+        float t, endT = -1f, bossT = -1f;
+        bool shot1, shot2, shot3, shotBoss, shotEnd;
 
         void Start()
         {
@@ -25,63 +25,69 @@ namespace RecruitRush
         void Update()
         {
             t += Time.deltaTime;
-            switch (gm.Current)
+            if (gm.Current == GameManager.State.Ready)
             {
-                case GameManager.State.Ready:
-                    if (t > 1f)
-                    {
-                        Shot("0_start");
-                        gm.Begin();
-                    }
-                    break;
-                case GameManager.State.Running:
-                    Steer();
-                    if (!shotRun && t > 4.5f) { shotRun = true; Shot("1_run"); }
-                    if (gm.Squad.Engaged && clashT < 0f) clashT = t;
-                    if (!shotClash && clashT >= 0f && t - clashT > 0.3f) { shotClash = true; Shot("2_clash"); }
-                    break;
-                case GameManager.State.Battle:
-                    battleT += Time.deltaTime;
-                    if (!shotBattle && battleT > 1.5f) { shotBattle = true; Shot("3_battle"); }
-                    break;
-                default:
-                    if (endT < 0f)
-                    {
-                        endT = t;
-                        Debug.Log($"[AUTO] RESULT {gm.Current} squad={gm.Squad.Count} boss={gm.Boss.Hp:0}/{gm.Boss.MaxHp:0} time={t:0.0}s");
-                    }
-                    if (!shotEnd && t - endT > 2f) { shotEnd = true; Shot("4_result"); }
-                    if (t - endT > 3f) Application.Quit();
-                    break;
+                if (t > 1f) gm.Begin();
+                return;
             }
-            if (t > 150f)
+
+            if (gm.Current == GameManager.State.Playing)
+            {
+                gm.Squad.SetTargetX(ChooseX());
+                if (!shot1 && t > 6f) { shot1 = true; Shot("1_early"); }
+                if (!shot2 && t > 18f) { shot2 = true; Shot("2_mid"); }
+                if (!shot3 && gm.Director.FinalPhase && gm.Boss == null) { shot3 = true; Shot("3_final_wave"); }
+                if (gm.Boss != null && bossT < 0f) bossT = t;
+                if (!shotBoss && bossT >= 0f && t - bossT > 5f) { shotBoss = true; Shot("4_boss"); }
+                if (Mathf.FloorToInt(t) % 10 == 0 && Mathf.FloorToInt(t - Time.deltaTime) % 10 != 0)
+                    Debug.Log($"[AUTO] t={t:0} squad={gm.Squad.Count} kills={gm.Kills}");
+            }
+            else
+            {
+                if (endT < 0f)
+                {
+                    endT = t;
+                    string boss = gm.Boss ? $"{gm.Boss.Hp:0}/{gm.Boss.MaxHp:0}" : "not reached";
+                    Debug.Log($"[AUTO] RESULT {gm.Current} squad={gm.Squad.Count} kills={gm.Kills} boss={boss} time={t:0.0}s");
+                }
+                if (!shotEnd && t - endT > 2f) { shotEnd = true; Shot("5_result"); }
+                if (t - endT > 3f) Application.Quit();
+            }
+
+            if (t > 180f)
             {
                 Debug.Log("[AUTO] timeout");
                 Application.Quit();
             }
         }
 
-        void Steer()
+        float ChooseX()
         {
-            GateRow next = null;
-            float best = float.MaxValue, z = gm.Squad.transform.position.z;
-            foreach (var g in gm.Gates)
+            if (gm.Boss != null) return 0f;
+            float sz = gm.Squad.transform.position.z;
+            float range = gm.Squad.range;
+            int nearEnemies = 0, closeEnemies = 0;
+            float enemyX = 0f;
+            bool crate = false;
+            foreach (var target in Target.All)
             {
-                if (g.Used) continue;
-                float dz = g.transform.position.z - z;
-                if (dz > -0.5f && dz < best)
+                if (!target.Alive) continue;
+                float dz = target.FrontZ - sz;
+                if (target is UpgradeCrate && dz > 3f && dz < range) crate = true;
+                if (target is Enemy && dz > -1f)
                 {
-                    best = dz;
-                    next = g;
+                    if (dz < 7f) closeEnemies++;
+                    if (dz < 12f)
+                    {
+                        nearEnemies++;
+                        enemyX += target.transform.position.x;
+                    }
                 }
             }
-            if (next == null)
-            {
-                gm.Squad.SetTargetX(0f);
-                return;
-            }
-            bool left = GateSpec.PickLeft(next.Left, next.Right, gm.Squad.Count, gm.Squad.Tier);
-            gm.Squad.SetTargetX(left ? -2.2f : 2.2f);
+            // Upgrades first unless the enemies are about to hit; then fight; otherwise collect +1s.
+            if (crate && closeEnemies < 3) return LevelDirector.RightX;
+            if (nearEnemies >= 3) return enemyX / nearEnemies;
+            return LevelDirector.LeftX;
         }
 
         void Shot(string name)

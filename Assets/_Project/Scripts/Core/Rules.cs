@@ -5,7 +5,10 @@ namespace RecruitRush
     public static class Weapons
     {
         public static readonly string[] Names = { "PISTOL", "RIFLE", "MACHINE GUN", "ROCKETS" };
-        public static readonly float[] Dps = { 1f, 2f, 3.5f, 6f };
+        /// <summary>Damage per bullet.</summary>
+        public static readonly float[] Damage = { 1f, 2f, 3.5f, 6f };
+        /// <summary>Shots per second per soldier.</summary>
+        public const float FireRate = 2f;
 
         public static readonly Vector3[] GunScale =
         {
@@ -28,16 +31,35 @@ namespace RecruitRush
         };
 
         public static int MaxTier => Names.Length - 1;
-        public static float Power(int count, int tier) => count * Dps[Mathf.Clamp(tier, 0, MaxTier)];
-        /// <summary>How many enemies one soldier is worth in a crowd clash.</summary>
-        public static float ClashPower(int tier) => 1f + tier * 0.35f;
+    }
+
+    public enum UpgradeType { Weapon, FireRate, Damage }
+
+    public static class Upgrades
+    {
+        public const float FireRateStep = 0.25f;
+        public const float DamageStep = 0.3f;
+
+        public static string Label(UpgradeType t) => t switch
+        {
+            UpgradeType.Weapon => "WEAPON UP",
+            UpgradeType.FireRate => "FIRE RATE +25%",
+            _ => "DAMAGE +30%"
+        };
+
+        public static Color Color(UpgradeType t) => t switch
+        {
+            UpgradeType.Weapon => new Color(1f, 0.72f, 0.12f),
+            UpgradeType.FireRate => new Color(0.2f, 0.75f, 0.85f),
+            _ => new Color(0.85f, 0.35f, 0.85f)
+        };
     }
 
     /// <summary>Sunflower (Vogel) packing: dense, round crowd for any count.</summary>
     public static class Formation
     {
         const float Golden = 2.39996323f;
-        public const float MaxRadius = 2.9f;
+        public const float MaxRadius = 2.1f;
 
         public static float Spacing(int n, float baseSpacing) =>
             Mathf.Min(baseSpacing, (MaxRadius - 0.25f) / Mathf.Sqrt(Mathf.Max(1, n - 1)));
@@ -51,54 +73,5 @@ namespace RecruitRush
         }
 
         public static float Radius(int n, float spacing) => spacing * Mathf.Sqrt(Mathf.Max(0, n - 1)) + 0.25f;
-    }
-
-    public enum GateOp { Add, Subtract, Multiply, Divide, Weapon }
-
-    [System.Serializable]
-    public struct GateSpec
-    {
-        public GateOp op;
-        public int value;
-
-        public GateSpec(GateOp op, int value)
-        {
-            this.op = op;
-            this.value = value;
-        }
-
-        public bool IsPositive => op is GateOp.Add or GateOp.Multiply or GateOp.Weapon;
-
-        public string Label => op switch
-        {
-            GateOp.Add => "+" + value,
-            GateOp.Subtract => "-" + value,
-            GateOp.Multiply => "×" + value,
-            GateOp.Divide => "÷" + value,
-            GateOp.Weapon => Weapons.Names[Mathf.Clamp(value, 0, Weapons.MaxTier)],
-            _ => "?"
-        };
-
-        public void Apply(ref int count, ref int tier)
-        {
-            switch (op)
-            {
-                case GateOp.Add: count += value; break;
-                case GateOp.Subtract: count -= value; break;
-                case GateOp.Multiply: count *= value; break;
-                case GateOp.Divide: count = Mathf.Max(1, count / Mathf.Max(1, value)); break;
-                case GateOp.Weapon: tier = Mathf.Max(tier, value); break;
-            }
-            count = Mathf.Max(0, count);
-        }
-
-        public float PowerAfter(int count, int tier)
-        {
-            Apply(ref count, ref tier);
-            return Weapons.Power(count, tier);
-        }
-
-        public static bool PickLeft(GateSpec left, GateSpec right, int count, int tier) =>
-            left.PowerAfter(count, tier) >= right.PowerAfter(count, tier);
     }
 }

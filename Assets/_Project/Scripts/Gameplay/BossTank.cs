@@ -4,8 +4,8 @@ using UnityEngine;
 
 namespace RecruitRush
 {
-    /// <summary>End-of-level boss: a tank with an HP bar that shells the squad until destroyed.</summary>
-    public class BossTank : MonoBehaviour
+    /// <summary>Final boss: a tank that rolls down the middle lane, stops and shells the squad.</summary>
+    public class BossTank : Target
     {
         static readonly Color Hull = new(0.42f, 0.2f, 0.17f);
         static readonly Color Dark = new(0.18f, 0.16f, 0.15f);
@@ -13,18 +13,17 @@ namespace RecruitRush
 
         public float MaxHp { get; private set; }
         public float Hp { get; private set; }
-        public bool Active { get; set; }
-        public bool Dead { get; private set; }
+        public bool Dead => !Alive;
         public event System.Action Died;
 
-        float interval, fireTimer;
+        float interval, fireTimer, stopZ;
         int killsPerShot;
         PlayerSquad squad;
         Transform turret, muzzle, hpBar, hpFill;
         TextMesh hpText;
         readonly List<MeshRenderer> renderers = new();
 
-        public static BossTank Create(Transform parent, Vector3 pos, float hp, int kills, float interval, PlayerSquad squad)
+        public static BossTank Create(Transform parent, Vector3 pos, float hp, int kills, float interval, float stopZ, PlayerSquad squad)
         {
             var go = new GameObject("BossTank");
             go.transform.SetParent(parent, false);
@@ -33,7 +32,11 @@ namespace RecruitRush
             b.MaxHp = b.Hp = hp;
             b.killsPerShot = kills;
             b.interval = interval;
+            b.stopZ = stopZ;
             b.squad = squad;
+            b.halfWidth = 2.2f;
+            b.depth = 2.6f;
+            b.hitHeight = 1.2f;
             b.Build();
             return b;
         }
@@ -70,14 +73,13 @@ namespace RecruitRush
             UpdateBar();
         }
 
-        public Vector3 RandomHitPoint() =>
-            transform.position + new Vector3(Random.Range(-1.5f, 1.5f), Random.Range(0.6f, 2.2f), Random.Range(-2f, 2f));
-
-        public void Damage(float amount)
+        public override void TakeHit(float damage)
         {
-            if (Dead) return;
-            Hp = Mathf.Max(0f, Hp - amount);
+            if (!Alive) return;
+            Hp = Mathf.Max(0f, Hp - damage);
             UpdateBar();
+            if (Random.value < 0.04f)
+                ExplosionFX.Spawn(transform.position + new Vector3(Random.Range(-1.4f, 1.4f), Random.Range(0.8f, 2f), -depth), 0.5f, false);
             if (Hp <= 0f) Die();
         }
 
@@ -91,14 +93,22 @@ namespace RecruitRush
 
         void Update()
         {
-            if (Dead || !Active || squad == null || squad.Count <= 0) return;
+            var gm = GameManager.I;
+            if (!Alive || squad == null || !gm || gm.WorldSpeed <= 0f) return;
+            float dt = Time.deltaTime;
+
+            Vector3 p = transform.position;
+            if (p.z > stopZ) p.z = Mathf.Max(stopZ, p.z - Mathf.Max(2f, gm.WorldSpeed * 0.5f) * dt);
+            transform.position = p;
+
             Vector3 dir = squad.transform.position - turret.position;
             dir.y = 0f;
             if (dir.sqrMagnitude > 0.01f)
-                turret.rotation = Quaternion.Slerp(turret.rotation, Quaternion.LookRotation(dir), 1f - Mathf.Exp(-5f * Time.deltaTime));
+                turret.rotation = Quaternion.Slerp(turret.rotation, Quaternion.LookRotation(dir), 1f - Mathf.Exp(-5f * dt));
 
-            fireTimer += Time.deltaTime;
-            if (fireTimer >= interval)
+            if (p.z - squad.transform.position.z > squad.range + 10f) return;
+            fireTimer += dt;
+            if (fireTimer >= interval && squad.Count > 0)
             {
                 fireTimer = 0f;
                 StartCoroutine(FireShell());
@@ -113,7 +123,7 @@ namespace RecruitRush
             ExplosionFX.Spawn(from, 0.9f, false);
 
             var shell = Art.Box("Shell", null, from, Vector3.one * 0.35f, Art.Glow(new Color(1f, 0.6f, 0.2f)), Prims.Sphere, false).transform;
-            const float dur = 0.6f;
+            const float dur = 0.7f;
             for (float t = 0f; t < dur; t += Time.deltaTime)
             {
                 float k = t / dur;
@@ -127,13 +137,12 @@ namespace RecruitRush
             ExplosionFX.Spawn(to, 2.4f, true);
             var gm = GameManager.I;
             if (gm && gm.Cam) gm.Cam.Shake(0.35f);
-            if (!Dead && squad.Count > 0) squad.SetCount(squad.Count - killsPerShot, to);
+            if (Alive && squad.Count > 0) squad.SetCount(squad.Count - killsPerShot, to);
         }
 
         void Die()
         {
-            Dead = true;
-            Active = false;
+            Alive = false;
             var burnt = Art.Lit(new Color(0.12f, 0.11f, 0.1f));
             foreach (var r in renderers)
                 if (r) r.sharedMaterial = burnt;
@@ -146,7 +155,8 @@ namespace RecruitRush
         {
             for (int i = 0; i < 4; i++)
             {
-                ExplosionFX.Spawn(RandomHitPoint(), 2.5f + i * 0.4f, true);
+                ExplosionFX.Spawn(transform.position + new Vector3(Random.Range(-1.5f, 1.5f), Random.Range(0.6f, 2.2f), Random.Range(-2f, 2f)),
+                    2.5f + i * 0.4f, true);
                 yield return new WaitForSeconds(0.12f);
             }
             turret.SetParent(null, true);
