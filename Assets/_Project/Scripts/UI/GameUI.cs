@@ -1,3 +1,4 @@
+using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
@@ -5,15 +6,27 @@ using UnityEngine.UI;
 
 namespace RecruitRush
 {
-    /// <summary>Portrait HUD and result screen (uGUI, built in code for the prototype).</summary>
+    /// <summary>
+    /// Portrait HUD and result screen, built in code with TextMeshPro and procedural rounded panels.
+    /// Reference resolution 1080×1920; everything lives inside the safe area.
+    /// </summary>
     public class GameUI : MonoBehaviour
     {
-        Text levelText, coinsText, weaponText, hintText, bannerText, resultTitle, resultDetails, resultButtonLabel;
-        GameObject resultPanel;
-        RectTransform card, progressFill;
+        TextMeshProUGUI levelText, coinsText, hintText, hintArrows, bannerText;
+        TextMeshProUGUI weaponText, rateText, dmgText, bossTag;
+        RectTransform progressFill, coinIcon;
         Image progressFillImage;
+        RectTransform weaponChip, rateChip, dmgChip;
+
+        GameObject resultPanel;
+        RectTransform card;
+        Image ribbon, buttonFace;
+        TextMeshProUGUI resultTitle, resultDetails, buttonLabel;
         Button resultButton;
-        float bannerTime;
+
+        float bannerTime, shownProgress;
+        int lastTier = -1;
+        float lastRate = -1f, lastDmg = -1f;
 
         public static GameUI Create()
         {
@@ -39,131 +52,176 @@ namespace RecruitRush
 
         void Build()
         {
-            var root = (RectTransform)transform;
-            var safe = MakeRect(root, "SafeArea", Vector2.zero, Vector2.one);
+            var safe = UiKit.Stretch(transform, "SafeArea");
             safe.gameObject.AddComponent<SafeArea>();
+            BuildTopBar(safe);
+            BuildProgress(safe);
+            BuildStats(safe);
 
-            levelText = MakeText(safe, "Level", new Vector2(0f, 1f), new Vector2(40f, -60f), new Vector2(600f, 90f), 64, TextAnchor.UpperLeft);
-            weaponText = MakeText(safe, "Weapon", new Vector2(0f, 1f), new Vector2(40f, -140f), new Vector2(700f, 70f), 44, TextAnchor.UpperLeft);
-            coinsText = MakeText(safe, "Coins", new Vector2(1f, 1f), new Vector2(-40f, -60f), new Vector2(500f, 90f), 58, TextAnchor.UpperRight);
-            hintText = MakeText(safe, "Hint", new Vector2(0.5f, 0.2f), Vector2.zero, new Vector2(1000f, 120f), 66, TextAnchor.MiddleCenter);
-            bannerText = MakeText(safe, "Banner", new Vector2(0.5f, 0.68f), Vector2.zero, new Vector2(1000f, 140f), 84, TextAnchor.MiddleCenter);
-            bannerText.gameObject.SetActive(false);
+            var banner = UiKit.Rect(safe, "Banner", new Vector2(0.5f, 0.66f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(1000f, 170f));
+            bannerText = UiKit.Label(banner, "Text", "", 100f, Color.white);
+            banner.gameObject.SetActive(false);
 
-            var bar = MakeRect(safe, "Progress", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f));
-            bar.anchoredPosition = new Vector2(0f, -215f);
-            bar.sizeDelta = new Vector2(700f, 26f);
-            bar.gameObject.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.45f);
-            progressFill = MakeRect(bar, "Fill", Vector2.zero, new Vector2(0f, 1f));
-            progressFillImage = progressFill.gameObject.AddComponent<Image>();
-            progressFillImage.color = new Color(0.45f, 0.85f, 0.35f);
+            var hint = UiKit.Rect(safe, "Hint", new Vector2(0.5f, 0.2f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(900f, 200f));
+            hintText = UiKit.Label(hint, "Text", "", 64f, Color.white);
+            hintArrows = UiKit.Label(hint, "Arrows", "<          >", 90f, UiColors.Gold);
+            hintArrows.rectTransform.anchoredPosition = new Vector2(0f, -90f);
 
-            resultPanel = MakeRect(root, "Result", Vector2.zero, Vector2.one).gameObject;
-            resultPanel.AddComponent<Image>().color = new Color(0f, 0f, 0f, 0.6f);
+            BuildResult();
+        }
 
-            card = MakeRect(resultPanel.transform, "Card", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
-            card.sizeDelta = new Vector2(880f, 720f);
-            card.gameObject.AddComponent<Image>().color = new Color(0.13f, 0.16f, 0.12f, 0.96f);
+        void BuildTopBar(RectTransform safe)
+        {
+            var levelPill = UiKit.Rect(safe, "LevelPill", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(36f, -36f), new Vector2(320f, 100f));
+            UiKit.Panel(levelPill, UiColors.Panel);
+            levelText = UiKit.Label(levelPill, "Text", "LEVEL 1", 54f, Color.white);
 
-            resultTitle = MakeText(card, "Title", new Vector2(0.5f, 1f), new Vector2(0f, -110f), new Vector2(840f, 120f), 84, TextAnchor.MiddleCenter);
-            resultDetails = MakeText(card, "Details", new Vector2(0.5f, 0.5f), new Vector2(0f, 40f), new Vector2(800f, 220f), 52, TextAnchor.MiddleCenter);
+            var coinPill = UiKit.Rect(safe, "CoinPill", new Vector2(1f, 1f), new Vector2(1f, 1f), new Vector2(-36f, -36f), new Vector2(320f, 100f));
+            UiKit.Panel(coinPill, UiColors.Panel);
+            coinIcon = UiKit.Coin(coinPill, new Vector2(0f, 0.5f), new Vector2(56f, 0f), 72f);
+            coinsText = UiKit.Label(coinPill, "Text", "0", 54f, UiColors.Gold, TextAlignmentOptions.MidlineRight);
+            coinsText.rectTransform.offsetMax = new Vector2(-28f, 0f);
+        }
 
-            var buttonRect = MakeRect(card, "Button", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f));
-            buttonRect.anchoredPosition = new Vector2(0f, 140f);
-            buttonRect.sizeDelta = new Vector2(540f, 160f);
-            var image = buttonRect.gameObject.AddComponent<Image>();
-            image.color = new Color(0.38f, 0.72f, 0.28f);
-            resultButton = buttonRect.gameObject.AddComponent<Button>();
-            resultButton.targetGraphic = image;
-            resultButtonLabel = MakeText(buttonRect, "Label", new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(520f, 150f), 70, TextAnchor.MiddleCenter);
+        void BuildProgress(RectTransform safe)
+        {
+            var track = UiKit.Rect(safe, "Progress", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-30f, -172f), new Vector2(740f, 36f));
+            UiKit.Panel(track, UiColors.Track);
+            progressFill = UiKit.Stretch(track, "Fill");
+            progressFill.anchorMax = new Vector2(0f, 1f);
+            progressFillImage = UiKit.Panel(progressFill, UiColors.Green);
+
+            var boss = UiKit.Rect(track, "Boss", new Vector2(1f, 0.5f), new Vector2(0f, 0.5f), new Vector2(14f, 0f), new Vector2(110f, 56f));
+            UiKit.Panel(boss, UiColors.RedDark);
+            bossTag = UiKit.Label(boss, "Text", "BOSS", 34f, Color.white);
+        }
+
+        void BuildStats(RectTransform safe)
+        {
+            var row = UiKit.Rect(safe, "Stats", new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(0f, -232f), new Vector2(900f, 70f));
+            weaponChip = Chip(row, "Weapon", new Vector2(-300f, 0f), 300f, UiColors.Gold, out weaponText);
+            rateChip = Chip(row, "Rate", new Vector2(15f, 0f), 270f, UiColors.Cyan, out rateText);
+            dmgChip = Chip(row, "Damage", new Vector2(300f, 0f), 270f, UiColors.Magenta, out dmgText);
+        }
+
+        static RectTransform Chip(RectTransform row, string name, Vector2 pos, float width, Color accent, out TextMeshProUGUI label)
+        {
+            var chip = UiKit.Rect(row, name, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), pos, new Vector2(width, 66f));
+            UiKit.Panel(chip, UiColors.Panel);
+            var bar = UiKit.Rect(chip, "Accent", new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(10f, 0f), new Vector2(12f, 44f));
+            UiKit.Panel(bar, accent, UiKit.Circle);
+            label = UiKit.Label(chip, "Text", "", 36f, accent);
+            label.rectTransform.offsetMin = new Vector2(20f, 0f);
+            return chip;
+        }
+
+        void BuildResult()
+        {
+            resultPanel = UiKit.Stretch(transform, "Result").gameObject;
+            var dim = resultPanel.AddComponent<Image>();
+            dim.color = new Color(0f, 0f, 0f, 0.62f);
+
+            card = UiKit.Rect(resultPanel.transform, "Card", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 40f), new Vector2(880f, 820f));
+            UiKit.Panel(card, UiColors.PanelSolid);
+
+            var ribbonRect = UiKit.Rect(card, "Ribbon", new Vector2(0.5f, 1f), new Vector2(0.5f, 0.5f), new Vector2(0f, -10f), new Vector2(960f, 170f));
+            ribbon = UiKit.Panel(ribbonRect, UiColors.Green);
+            resultTitle = UiKit.Label(ribbonRect, "Title", "", 86f, Color.white);
+
+            var detailsRect = UiKit.Rect(card, "Details", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 50f), new Vector2(800f, 300f));
+            resultDetails = UiKit.Label(detailsRect, "Text", "", 58f, Color.white);
+            resultDetails.lineSpacing = 18f;
+
+            var shadow = UiKit.Rect(card, "ButtonShadow", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 82f), new Vector2(580f, 170f));
+            UiKit.Panel(shadow, UiColors.GreenDark);
+            var btn = UiKit.Rect(card, "Button", new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0f, 96f), new Vector2(580f, 170f));
+            buttonFace = UiKit.Panel(btn, UiColors.Green);
+            buttonFace.raycastTarget = true;
+            resultButton = btn.gameObject.AddComponent<Button>();
+            resultButton.targetGraphic = buttonFace;
+            buttonLabel = UiKit.Label(btn, "Label", "", 84f, Color.white);
 
             resultPanel.SetActive(false);
         }
 
-        static RectTransform MakeRect(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax)
-        {
-            var r = new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>();
-            r.SetParent(parent, false);
-            r.anchorMin = anchorMin;
-            r.anchorMax = anchorMax;
-            r.offsetMin = r.offsetMax = Vector2.zero;
-            return r;
-        }
-
-        static Text MakeText(Transform parent, string name, Vector2 anchor, Vector2 pos, Vector2 size, int fontSize, TextAnchor align)
-        {
-            var go = new GameObject(name, typeof(RectTransform), typeof(Text), typeof(Outline));
-            var r = (RectTransform)go.transform;
-            r.SetParent(parent, false);
-            r.anchorMin = r.anchorMax = anchor;
-            r.pivot = new Vector2(align is TextAnchor.UpperLeft ? 0f : align is TextAnchor.UpperRight ? 1f : 0.5f,
-                align is TextAnchor.UpperLeft or TextAnchor.UpperRight ? 1f : 0.5f);
-            r.anchoredPosition = pos;
-            r.sizeDelta = size;
-            var t = go.GetComponent<Text>();
-            t.font = Art.Font;
-            t.fontSize = fontSize;
-            t.fontStyle = FontStyle.Bold;
-            t.alignment = align;
-            t.color = Color.white;
-            t.raycastTarget = false;
-            t.horizontalOverflow = HorizontalWrapMode.Overflow;
-            t.verticalOverflow = VerticalWrapMode.Overflow;
-            var o = go.GetComponent<Outline>();
-            o.effectColor = new Color(0f, 0f, 0f, 0.6f);
-            o.effectDistance = new Vector2(3f, -3f);
-            return t;
-        }
+        // ---------------- API used by GameManager ----------------
 
         public void SetLevel(int level) => levelText.text = "LEVEL " + level;
-        public void SetCoins(int coins) => coinsText.text = coins + " ¢";
-        public void SetStats(PlayerSquad squad) =>
-            weaponText.text = $"{Weapons.Names[squad.Tier]}   RATE x{squad.FireRateMul:0.##}   DMG x{squad.DamageMul:0.##}";
+
+        public void SetCoins(int coins)
+        {
+            coinsText.text = coins.ToString();
+            Pop.Play(coinIcon, 1.3f);
+        }
+
+        public void SetStats(PlayerSquad squad)
+        {
+            weaponText.text = Weapons.Names[squad.Tier];
+            rateText.text = $"RATE x{squad.FireRateMul:0.##}";
+            dmgText.text = $"DMG x{squad.DamageMul:0.##}";
+            // Punch the chip that just changed.
+            if (lastTier >= 0 && squad.Tier != lastTier) Pop.Play(weaponChip, 1.25f);
+            if (lastRate >= 0f && !Mathf.Approximately(squad.FireRateMul, lastRate)) Pop.Play(rateChip, 1.25f);
+            if (lastDmg >= 0f && !Mathf.Approximately(squad.DamageMul, lastDmg)) Pop.Play(dmgChip, 1.25f);
+            lastTier = squad.Tier;
+            lastRate = squad.FireRateMul;
+            lastDmg = squad.DamageMul;
+        }
 
         public void SetProgress(float t01, bool final)
         {
-            progressFill.anchorMax = new Vector2(final ? 1f : t01, 1f);
-            progressFillImage.color = final ? new Color(0.95f, 0.3f, 0.25f) : new Color(0.45f, 0.85f, 0.35f);
+            float target = final ? 1f : t01;
+            shownProgress = Mathf.MoveTowards(shownProgress, target, Time.deltaTime * 0.6f);
+            progressFill.anchorMax = new Vector2(Mathf.Max(0.04f, shownProgress), 1f);
+            progressFillImage.color = final ? UiColors.Red : Color.Lerp(UiColors.Green, UiColors.Gold, Mathf.InverseLerp(0.6f, 1f, shownProgress));
+            if (final) bossTag.transform.localScale = Vector3.one * (1f + Mathf.Sin(Time.unscaledTime * 8f) * 0.08f);
         }
+
+        public void ShowHint(string text)
+        {
+            hintText.transform.parent.gameObject.SetActive(true);
+            hintText.text = text;
+        }
+
+        public void HideHint() => hintText.transform.parent.gameObject.SetActive(false);
 
         public void ShowBanner(string text, Color color)
         {
             bannerText.text = text;
             bannerText.color = color;
-            bannerText.gameObject.SetActive(true);
+            bannerText.transform.parent.gameObject.SetActive(true);
             bannerTime = 1.6f;
-            Pop.Play(bannerText.transform, 0.4f);
+            Pop.Play(bannerText.transform, 0.3f);
         }
-
-        public void ShowHint(string text)
-        {
-            hintText.gameObject.SetActive(true);
-            hintText.text = text;
-        }
-
-        public void HideHint() => hintText.gameObject.SetActive(false);
 
         public void ShowResult(bool win, string details, System.Action onClick)
         {
             resultPanel.SetActive(true);
             resultTitle.text = win ? "MISSION COMPLETE" : "MISSION FAILED";
-            resultTitle.color = win ? new Color(0.6f, 1f, 0.45f) : new Color(1f, 0.45f, 0.4f);
+            ribbon.color = win ? UiColors.Green : UiColors.Red;
             resultDetails.text = details;
-            resultButtonLabel.text = win ? "NEXT" : "RETRY";
+            buttonLabel.text = win ? "NEXT" : "RETRY";
             resultButton.onClick.RemoveAllListeners();
             resultButton.onClick.AddListener(() => onClick());
-            Pop.Play(card, 0.6f);
+            Pop.Play(card, 0.5f);
         }
 
         void Update()
         {
-            if (hintText.gameObject.activeSelf)
-                hintText.transform.localScale = Vector3.one * (1f + Mathf.Sin(Time.unscaledTime * 4f) * 0.05f);
+            float time = Time.unscaledTime;
+            if (hintText.transform.parent.gameObject.activeSelf)
+            {
+                hintText.transform.localScale = Vector3.one * (1f + Mathf.Sin(time * 4f) * 0.04f);
+                // Arrows sweep left-right like a finger drag.
+                hintArrows.rectTransform.anchoredPosition = new Vector2(Mathf.Sin(time * 3f) * 60f, -90f);
+            }
             if (bannerTime > 0f)
             {
                 bannerTime -= Time.unscaledDeltaTime;
-                if (bannerTime <= 0f) bannerText.gameObject.SetActive(false);
+                if (bannerTime <= 0f) bannerText.transform.parent.gameObject.SetActive(false);
             }
+            if (resultPanel.activeSelf)
+                buttonFace.transform.localScale = Vector3.one * (1f + Mathf.Sin(time * 5f) * 0.03f);
         }
     }
 
