@@ -30,13 +30,16 @@ namespace RecruitRush
         public int Kills { get; private set; }
         public float WorldSpeed => Current == State.Playing ? conveyorSpeed : 0f;
 
-        int coins;
+        int coins, lastCount;
 
         void Awake()
         {
             I = this;
             Application.targetFrameRate = 60;
+            Time.timeScale = 1f;
             Art.Init(assets);
+            Fx.Init(assets);
+            Sfx.Init();
             Level = Mathf.Max(1, PlayerPrefs.GetInt(LevelKey, 1));
             if (int.TryParse(CommandLine.Value("-level"), out int forced)) Level = Mathf.Max(1, forced);
             coins = PlayerPrefs.GetInt(CoinsKey, 0);
@@ -113,6 +116,10 @@ namespace RecruitRush
             Debug.Log($"[UPGRADE] {type} -> {Weapons.Names[Squad.Tier]} rate x{Squad.FireRateMul:0.00} dmg x{Squad.DamageMul:0.00}");
             FloatingText.Spawn(Squad.transform, new Vector3(0f, 2.8f, 0f), text, Upgrades.Color(type));
             UI.ShowBanner(text, Upgrades.Color(type));
+            Fx.Sparks(Squad.transform.position + Vector3.up, Upgrades.Color(type), 20);
+            Sfx.Upgrade();
+            Haptics.Medium();
+            Cam.Shake(0.12f);
         }
 
         public void OnFinalWave()
@@ -135,6 +142,9 @@ namespace RecruitRush
             Current = State.Win;
             Squad.Firing = false;
             Cam.Shake(0.7f);
+            Sfx.Boom(3f);
+            Haptics.Heavy();
+            StartCoroutine(SlowMotion());
             int reward = 20 + Level * 5 + Squad.Count + Kills / 2;
             coins += reward;
             PlayerPrefs.SetInt(CoinsKey, coins);
@@ -143,8 +153,21 @@ namespace RecruitRush
             StartCoroutine(ShowResult(true, $"Survivors: {Squad.Count}   Kills: {Kills}\n+{reward} coins"));
         }
 
+        IEnumerator SlowMotion()
+        {
+            Time.timeScale = 0.25f;
+            yield return new WaitForSecondsRealtime(0.9f);
+            Time.timeScale = 1f;
+        }
+
         void OnSquadCount(int count)
         {
+            if (count < lastCount && Current == State.Playing)
+            {
+                Sfx.SoldierLost();
+                Haptics.Light();
+            }
+            lastCount = count;
             if (count > 0 || Current != State.Playing) return;
             Current = State.Lose;
             Squad.Firing = false;

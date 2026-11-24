@@ -42,6 +42,8 @@ namespace RecruitRush
             {
                 taken = true;
                 squad.Add(value);
+                Fx.Collect(p + Vector3.up * 0.8f);
+                Sfx.Pickup();
                 StartCoroutine(Collect());
             }
             else if (p.z < sp.z - 6f) Destroy(gameObject);
@@ -65,8 +67,12 @@ namespace RecruitRush
         public static readonly Color UniformColor = new(0.62f, 0.18f, 0.15f);
         public static readonly Color HelmetColor = new(0.38f, 0.1f, 0.08f);
 
-        float hp, runSpeed, phase;
+        static readonly Color HitSpark = new(1f, 0.55f, 0.4f);
+
+        float hp, runSpeed, phase, flashTime;
         PlayerSquad squad;
+        MeshRenderer[] renderers;
+        Material[] originals;
 
         public static Enemy Spawn(Transform parent, Vector3 pos, float hp, float runSpeed, PlayerSquad squad)
         {
@@ -83,11 +89,25 @@ namespace RecruitRush
             e.phase = Random.value * 10f;
             var model = UnitFactory.Soldier(go.transform, UniformColor, HelmetColor, out _);
             model.localRotation = Quaternion.Euler(0f, 180f, 0f);
+            e.renderers = go.GetComponentsInChildren<MeshRenderer>();
+            e.originals = new Material[e.renderers.Length];
+            for (int i = 0; i < e.renderers.Length; i++) e.originals[i] = e.renderers[i].sharedMaterial;
             return e;
+        }
+
+        void SetFlash(bool on)
+        {
+            var white = Art.Lit(Color.white);
+            for (int i = 0; i < renderers.Length; i++) renderers[i].sharedMaterial = on ? white : originals[i];
         }
 
         void Update()
         {
+            if (flashTime > 0f)
+            {
+                flashTime -= Time.deltaTime;
+                if (flashTime <= 0f) SetFlash(false);
+            }
             var gm = GameManager.I;
             if (!Alive || squad == null || !gm || gm.WorldSpeed <= 0f) return;
             float dt = Time.deltaTime;
@@ -115,8 +135,18 @@ namespace RecruitRush
         {
             if (!Alive) return;
             hp -= damage;
-            if (hp > 0f) return;
+            Vector3 chest = transform.position + Vector3.up * 0.5f + Vector3.back * 0.2f;
+            if (hp > 0f)
+            {
+                if (flashTime <= 0f) SetFlash(true);
+                flashTime = 0.06f;
+                if (Random.value < 0.35f) Fx.Sparks(chest, HitSpark, 2);
+                return;
+            }
             Alive = false;
+            if (flashTime > 0f) SetFlash(false);
+            flashTime = 0f;
+            Fx.Sparks(chest, HitSpark, 6);
             var gm = GameManager.I;
             if (gm) gm.OnEnemyKilled();
             DeathFly.Launch(transform, Vector3.forward + Random.insideUnitSphere * 0.5f);
@@ -188,9 +218,17 @@ namespace RecruitRush
             hp -= damage;
             punch = 1f;
             hpText.text = Mathf.Max(0, Mathf.CeilToInt(hp)).ToString();
-            if (hp > 0f) return;
+            Sfx.CrateHit();
+            if (hp > 0f)
+            {
+                if (Random.value < 0.3f)
+                    Fx.Sparks(transform.position + new Vector3(Random.Range(-1f, 1f), Random.Range(0.4f, 1.5f), -depth), Wood, 2);
+                return;
+            }
             Alive = false;
-            ExplosionFX.Spawn(transform.position + Vector3.up, 2f, true);
+            ExplosionFX.Spawn(transform.position + Vector3.up, 2f, Upgrades.Color(type));
+            Sfx.Boom(1.2f);
+            Haptics.Medium();
             var gm = GameManager.I;
             if (gm) gm.ApplyUpgrade(type);
             Destroy(gameObject);

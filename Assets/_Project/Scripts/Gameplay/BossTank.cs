@@ -78,8 +78,9 @@ namespace RecruitRush
             if (!Alive) return;
             Hp = Mathf.Max(0f, Hp - damage);
             UpdateBar();
-            if (Random.value < 0.04f)
-                ExplosionFX.Spawn(transform.position + new Vector3(Random.Range(-1.4f, 1.4f), Random.Range(0.8f, 2f), -depth), 0.5f, false);
+            if (Random.value < 0.15f)
+                Fx.Sparks(transform.position + new Vector3(Random.Range(-1.4f, 1.4f), Random.Range(0.8f, 2f), -depth),
+                    new Color(1f, 0.8f, 0.4f), 3);
             if (Hp <= 0f) Die();
         }
 
@@ -121,6 +122,7 @@ namespace RecruitRush
             Vector2 off = Random.insideUnitCircle * squad.Radius * 0.5f;
             Vector3 to = squad.transform.position + new Vector3(off.x, 0f, off.y);
             ExplosionFX.Spawn(from, 0.9f, false);
+            Sfx.Boom(0.4f);
 
             var shell = Art.Box("Shell", null, from, Vector3.one * 0.35f, Art.Glow(new Color(1f, 0.6f, 0.2f)), Prims.Sphere, false).transform;
             const float dur = 0.7f;
@@ -135,6 +137,8 @@ namespace RecruitRush
             Destroy(shell.gameObject);
 
             ExplosionFX.Spawn(to, 2.4f, true);
+            Sfx.Boom(2f);
+            Haptics.Heavy();
             var gm = GameManager.I;
             if (gm && gm.Cam) gm.Cam.Shake(0.35f);
             if (Alive && squad.Count > 0) squad.SetCount(squad.Count - killsPerShot, to);

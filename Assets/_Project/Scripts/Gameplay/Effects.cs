@@ -106,35 +106,25 @@ namespace RecruitRush
         }
     }
 
-    public class ExplosionFX : MonoBehaviour
+    /// <summary>Particle explosion plus optional flying debris chunks.</summary>
+    public static class ExplosionFX
     {
-        const float Duration = 0.45f;
-        static readonly Color Fire = new(1f, 0.55f, 0.15f);
         static readonly Color DebrisColor = new(0.25f, 0.22f, 0.2f);
-        float t, size;
 
-        public static void Spawn(Vector3 pos, float size, bool debris)
+        public static void Spawn(Vector3 pos, float size, bool debris) => Spawn(pos, size, debris ? DebrisColor : (Color?)null);
+
+        public static void Spawn(Vector3 pos, float size, Color? debrisColor)
         {
-            var go = Art.Box("Boom", null, pos, Vector3.one * 0.01f, Art.Glow(Fire), Prims.Sphere, false);
-            go.AddComponent<ExplosionFX>().size = size;
-            if (!debris) return;
+            Fx.Explosion(pos, size);
+            if (debrisColor == null) return;
             int n = Mathf.RoundToInt(size * 2f);
+            var mat = Art.Lit(debrisColor.Value);
             for (int i = 0; i < n; i++)
             {
-                var d = Art.Box("Debris", null, pos + Vector3.up * 0.2f, Vector3.one * Random.Range(0.12f, 0.25f),
-                    Art.Lit(DebrisColor), null, false);
+                var d = Art.Box("Debris", null, pos + Vector3.up * 0.2f, Vector3.one * Random.Range(0.12f, 0.25f), mat, null, false);
                 d.AddComponent<DeathFly>().Init(Random.insideUnitSphere * 4f + Vector3.up * Random.Range(3f, 6f),
                     Random.insideUnitSphere * 600f, Random.Range(0.6f, 1f), true);
             }
-        }
-
-        void Update()
-        {
-            t += Time.deltaTime;
-            float k = t / Duration;
-            float s = k < 0.35f ? Mathf.Lerp(0.2f, 1f, k / 0.35f) : Mathf.Lerp(1f, 0f, (k - 0.35f) / 0.65f);
-            transform.localScale = Vector3.one * (size * s);
-            if (k >= 1f) Destroy(gameObject);
         }
     }
 

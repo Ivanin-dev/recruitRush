@@ -8,5 +8,9 @@ namespace RecruitRush
     {
         public Material lit;
         public Material glow;
+        [Tooltip("Transparent URP particle material with HDR tint (sparks, fire, flashes).")]
+        public Material fxGlow;
+        [Tooltip("Transparent URP particle material (smoke, dust).")]
+        public Material fxSmoke;
     }
 }

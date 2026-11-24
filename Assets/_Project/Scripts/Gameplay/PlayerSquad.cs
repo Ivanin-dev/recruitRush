@@ -160,11 +160,13 @@ namespace RecruitRush
             float damage = Weapons.Damage[Tier] * DamageMul * (Count / (float)units.Count);
             Color color = Weapons.TracerColor[Tier];
             Vector3 muzzleLocal = Weapons.GunPos[Tier] + new Vector3(0f, 0f, Weapons.GunScale[Tier].z * 0.5f);
+            if (shots > 0) Sfx.Shot(Tier);
 
             for (int s = 0; s < shots; s++)
             {
                 var u = units[Random.Range(0, units.Count)];
                 Vector3 m = u.root.TransformPoint(muzzleLocal);
+                if (s < 12) Fx.Muzzle(m, color);
                 var target = Target.FindAhead(m.x, m.z, range);
                 Vector3 end;
                 if (target)

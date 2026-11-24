@@ -14,3 +14,5 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RecruitRush.GameAssets
   lit: {fileID: 2100000, guid: b0ad7859e61eae64cbfc1cba082ac840, type: 2}
   glow: {fileID: 2100000, guid: a7441e780c48a5d46a88fbda955a9e3c, type: 2}
+  fxGlow: {fileID: 2100000, guid: c488b70eb2124f649852a30cb66d0e66, type: 2}
+  fxSmoke: {fileID: 2100000, guid: ed77bc49227c8dc40920df31593687f7, type: 2}

@@ -32,6 +32,8 @@ namespace RecruitRush.EditorTools
             var assets = LoadOrCreate<GameAssets>(Root + "/Data/GameAssets.asset");
             assets.lit = lit;
             assets.glow = glow;
+            assets.fxGlow = MakeParticleMaterial(Root + "/Materials/M_FxGlow.mat", 3f);
+            assets.fxSmoke = MakeParticleMaterial(Root + "/Materials/M_FxSmoke.mat", 1f);
             EditorUtility.SetDirty(assets);
             var profile = MakeVolumeProfile(Root + "/Data/VP_Game.asset");
             AssetDatabase.SaveAssets();
@@ -100,6 +102,7 @@ namespace RecruitRush.EditorTools
             PlayerSettings.defaultScreenWidth = 540;
             PlayerSettings.defaultScreenHeight = 960;
             PlayerSettings.resizableWindow = true;
+            PlayerSettings.runInBackground = true; // the autoplay bot must keep running when the window loses focus
 
             var quality = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/QualitySettings.asset");
             if (quality.Length > 0)
@@ -135,6 +138,34 @@ namespace RecruitRush.EditorTools
                 mat.SetColor("_EmissionColor", Color.white);
                 mat.globalIlluminationFlags = MaterialGlobalIlluminationFlags.None;
             }
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
+        /// <summary>Alpha-blended URP Particles/Unlit; intensity above 1 makes it bloom.</summary>
+        static Material MakeParticleMaterial(string path, float intensity)
+        {
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (!mat)
+            {
+                var shader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
+                if (!shader) throw new Exception("URP Particles/Unlit shader not found");
+                mat = new Material(shader);
+                AssetDatabase.CreateAsset(mat, path);
+            }
+            mat.SetColor("_BaseColor", Color.white * intensity);
+            mat.SetFloat("_Surface", 1f);
+            mat.SetFloat("_Blend", 0f);
+            mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            mat.SetFloat("_SrcBlendAlpha", (float)UnityEngine.Rendering.BlendMode.One);
+            mat.SetFloat("_DstBlendAlpha", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            mat.SetFloat("_ZWrite", 0f);
+            mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            mat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
+            mat.DisableKeyword("_ALPHAMODULATE_ON");
+            mat.SetOverrideTag("RenderType", "Transparent");
+            mat.renderQueue = (int)RenderQueue.Transparent;
             EditorUtility.SetDirty(mat);
             return mat;
         }

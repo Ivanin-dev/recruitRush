@@ -10,12 +10,12 @@ $version = (Select-String "$project\ProjectSettings\ProjectVersion.txt" -Pattern
 $unity = "C:\Program Files\Unity\Hub\Editor\$version\Editor\Unity.exe"
 $log = "$project\Logs\android_build.log"
 
-$args = @('-batchmode', '-projectPath', "`"$project`"", '-buildTarget', 'Android',
+$unityArgs = @('-batchmode', '-projectPath', "`"$project`"", '-buildTarget', 'Android',
           '-executeMethod', 'RecruitRush.EditorTools.ProjectSetup.BuildAndroidBatch', '-logFile', "`"$log`"")
-if ($Dev) { $args += '-devbuild' }
+if ($Dev) { $unityArgs += '-devbuild' }
 
 Write-Host "Building with Unity $version ..."
-$p = Start-Process -FilePath $unity -ArgumentList $args -Wait -PassThru
+$p = Start-Process -FilePath $unity -ArgumentList $unityArgs -Wait -PassThru
 Select-String $log -Pattern 'error CS|\[SETUP\]|CommandInvokationFailure|Exception:' | ForEach-Object { $_.Line }
 if ($p.ExitCode -ne 0) { Write-Host "FAILED (exit $($p.ExitCode)). Full log: $log"; exit $p.ExitCode }
 Write-Host "Done: installed and launched on the phone."
