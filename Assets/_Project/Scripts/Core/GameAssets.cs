@@ -13,6 +13,11 @@ namespace RecruitRush
         [Tooltip("Transparent URP particle material (smoke, dust).")]
         public Material fxSmoke;
 
+        [Header("Text")]
+        public TMPro.TMP_FontAsset font;
+        [Tooltip("Font material with a dark outline, so numbers read over any background.")]
+        public Material fontOutline;
+
         [Header("Unit models (optional: falls back to primitives when empty)")]
         public GameObject playerSoldier;
         public GameObject enemySoldier;

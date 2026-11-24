@@ -75,23 +75,23 @@ namespace RecruitRush
         }
 
         /// <summary>World-space text. <paramref name="height"/> is the approximate line height in meters.</summary>
-        public static TextMesh Text(string name, Transform parent, Vector3 localPos, string text, float height, Color color,
-            int fontSize = 96)
+        public static TMPro.TextMeshPro Text(string name, Transform parent, Vector3 localPos, string text, float height, Color color)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
             go.transform.localPosition = localPos;
-            var tm = go.AddComponent<TextMesh>();
-            tm.font = Font;
-            tm.fontSize = fontSize;
-            tm.fontStyle = FontStyle.Bold;
-            tm.characterSize = height * 10f / fontSize;
-            tm.anchor = TextAnchor.MiddleCenter;
-            tm.alignment = TextAlignment.Center;
+            var tm = go.AddComponent<TMPro.TextMeshPro>();
+            if (assets && assets.font) tm.font = assets.font;
+            if (assets && assets.fontOutline) tm.fontSharedMaterial = assets.fontOutline;
+            tm.fontSize = height * 16f; // world-space TMP: tuned so "height" ≈ visible cap height in meters
+            tm.fontStyle = TMPro.FontStyles.Bold;
+            tm.alignment = TMPro.TextAlignmentOptions.Center;
+            tm.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
+            tm.overflowMode = TMPro.TextOverflowModes.Overflow;
+            tm.rectTransform.sizeDelta = new Vector2(10f, height * 2f);
             tm.color = color;
             tm.text = text;
             var r = go.GetComponent<MeshRenderer>();
-            r.sharedMaterial = Font.material;
             r.shadowCastingMode = ShadowCastingMode.Off;
             r.receiveShadows = false;
             return tm;
@@ -117,14 +117,15 @@ namespace RecruitRush
             model.transform.localPosition = Vector3.zero;
             model.transform.localRotation = Quaternion.identity;
 
-            if (!ModelScale.TryGetValue(prefab, out float scale))
+            // Cache the scale that makes this prefab 1 m tall, then multiply by the wanted height.
+            if (!ModelScale.TryGetValue(prefab, out float unitScale))
             {
                 float h = 0f;
                 foreach (var r in model.GetComponentsInChildren<Renderer>()) h = Mathf.Max(h, r.bounds.max.y - root.position.y);
-                scale = h > 0.01f ? height / h : 1f;
-                ModelScale[prefab] = scale;
+                unitScale = h > 0.01f ? 1f / h : 1f;
+                ModelScale[prefab] = unitScale;
             }
-            model.transform.localScale = Vector3.one * scale;
+            model.transform.localScale = Vector3.one * (unitScale * height);
 
             foreach (var r in model.GetComponentsInChildren<Renderer>())
             {

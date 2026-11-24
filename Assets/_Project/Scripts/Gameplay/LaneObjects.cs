@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 
 namespace RecruitRush
@@ -99,7 +99,7 @@ namespace RecruitRush
         }
         float armor;
         int breachCost = 1;
-        TextMesh hpLabel;
+        TMPro.TextMeshPro hpLabel;
         // Rifleman: halts at range and shoots instead of charging.
         float holdDistance, fireTimer;
         static readonly Color RiflemanMark = new(1f, 0.85f, 0.2f);
@@ -277,7 +277,7 @@ namespace RecruitRush
         int amount;
         float hp;
         PlayerSquad squad;
-        TextMesh hpText;
+        TMPro.TextMeshPro hpText;
         Transform body;
         float punch;
 

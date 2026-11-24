@@ -35,6 +35,7 @@ namespace RecruitRush.EditorTools
             assets.fxGlow = MakeParticleMaterial(Root + "/Materials/M_FxGlow.mat", 3f);
             assets.fxSmoke = MakeParticleMaterial(Root + "/Materials/M_FxSmoke.mat", 1f);
             AssignUnitModels(assets);
+            SetupText(assets);
             EditorUtility.SetDirty(assets);
             var profile = MakeVolumeProfile(Root + "/Data/VP_Game.asset");
             AssetDatabase.SaveAssets();
@@ -141,6 +142,43 @@ namespace RecruitRush.EditorTools
             }
             EditorUtility.SetDirty(mat);
             return mat;
+        }
+
+        const string TmpFontPath = "Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset";
+
+        /// <summary>Imports TMP Essential Resources once and builds an outlined font material (kept as an asset so its variant ships).</summary>
+        static void SetupText(GameAssets assets)
+        {
+            if (!AssetDatabase.IsValidFolder("Assets/TextMesh Pro"))
+            {
+                string pkg = Path.GetFullPath("Packages/com.unity.ugui/Package Resources/TMP Essential Resources.unitypackage");
+                if (File.Exists(pkg))
+                {
+                    AssetDatabase.ImportPackage(pkg, false);
+                    AssetDatabase.Refresh(ImportAssetOptions.ForceSynchronousImport);
+                }
+            }
+            var font = AssetDatabase.LoadAssetAtPath<TMPro.TMP_FontAsset>(TmpFontPath);
+            assets.font = font;
+            if (!font)
+            {
+                Debug.LogWarning("[SETUP] TMP font not found yet; world text uses TMP defaults.");
+                return;
+            }
+
+            const string matPath = Root + "/Materials/M_TextOutline.mat";
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+            if (!mat)
+            {
+                mat = new Material(font.material);
+                AssetDatabase.CreateAsset(mat, matPath);
+            }
+            mat.EnableKeyword("OUTLINE_ON");
+            mat.SetFloat("_OutlineWidth", 0.22f);
+            mat.SetColor("_OutlineColor", new Color(0.05f, 0.05f, 0.08f, 1f));
+            mat.SetFloat("_FaceDilate", 0.15f);
+            EditorUtility.SetDirty(mat);
+            assets.fontOutline = mat;
         }
 
         const string ToonyRoot = "Assets/ToonyTinyPeople/TT_ww1_demo";

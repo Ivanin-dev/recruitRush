@@ -14,7 +14,7 @@ namespace RecruitRush
 
         float value, growthStep, cap;
         PlayerSquad squad;
-        TextMesh label;
+        TMPro.TextMeshPro label;
         MeshRenderer panel;
         Transform panelT;
         float punch;

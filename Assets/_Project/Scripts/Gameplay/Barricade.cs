@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace RecruitRush
 {
@@ -10,7 +10,7 @@ namespace RecruitRush
         static readonly Color Steel = new(0.4f, 0.42f, 0.42f);
 
         float hp;
-        TextMesh hpText;
+        TMPro.TextMeshPro hpText;
         Transform body;
         float punch;
 

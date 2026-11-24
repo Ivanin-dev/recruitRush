@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace RecruitRush
@@ -131,7 +131,7 @@ namespace RecruitRush
     public class FloatingText : MonoBehaviour
     {
         const float Duration = 0.9f;
-        TextMesh tm;
+        TMPro.TextMeshPro tm;
         Color color;
         float t;
 

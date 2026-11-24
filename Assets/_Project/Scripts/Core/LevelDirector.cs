@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace RecruitRush
@@ -172,8 +172,13 @@ namespace RecruitRush
             else if (bossAt > 0f && t >= bossAt)
             {
                 bossAt = -1f;
-                var boss = BossTank.Create(field, new Vector3(MidX, 0f, SpawnZ + 6f), Config.bossHp, Config.bossKills,
-                    Config.bossInterval, squad.transform.position.z + 15f, squad);
+                // Odd levels: the giant marches in and slams; even levels: the tank shells from range.
+                Vector3 bossPos = new Vector3(MidX, 0f, SpawnZ + 6f);
+                Boss boss = Config.level % 2 == 1
+                    ? BossJuggernaut.Create(field, bossPos, Config.bossHp, Config.bossKills + 1, Config.bossInterval * 1.4f,
+                        squad.transform.position.z + 7f, squad)
+                    : BossTank.Create(field, bossPos, Config.bossHp, Config.bossKills, Config.bossInterval,
+                        squad.transform.position.z + 15f, squad);
                 gm.OnBossSpawned(boss);
             }
         }

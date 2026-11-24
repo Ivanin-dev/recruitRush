@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace RecruitRush
 {
@@ -12,7 +12,7 @@ namespace RecruitRush
         float hp, stopZ, interval, fireTimer;
         PlayerSquad squad;
         Transform gun, muzzle;
-        TextMesh hpText;
+        TMPro.TextMeshPro hpText;
 
         public static Turret Spawn(Transform parent, Vector3 pos, float hp, float stopZ, float interval, PlayerSquad squad)
         {

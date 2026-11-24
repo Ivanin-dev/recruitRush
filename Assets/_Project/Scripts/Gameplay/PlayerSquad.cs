@@ -37,7 +37,7 @@ namespace RecruitRush
 
         readonly List<Unit> units = new();
         Transform unitsRoot, badge;
-        TextMesh badgeText;
+        TMPro.TextMeshPro badgeText;
         Tracers tracers;
         float targetX, shotAcc, commanderAcc;
 

@@ -24,7 +24,7 @@ namespace RecruitRush
         public LevelConfig Config { get; private set; }
         public LevelDirector Director { get; private set; }
         public PlayerSquad Squad { get; private set; }
-        public BossTank Boss { get; private set; }
+        public Boss Boss { get; private set; }
         public CameraFollow Cam { get; private set; }
         public GameUI UI { get; private set; }
         public int Kills { get; private set; }
@@ -145,7 +145,7 @@ namespace RecruitRush
             UI.ShowBanner("FINAL WAVE!", new Color(1f, 0.45f, 0.35f));
         }
 
-        public void OnBossSpawned(BossTank boss)
+        public void OnBossSpawned(Boss boss)
         {
             Boss = boss;
             Boss.Died += OnBossDied;
