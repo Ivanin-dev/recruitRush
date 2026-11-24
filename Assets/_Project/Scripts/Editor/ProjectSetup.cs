@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
@@ -196,6 +197,43 @@ namespace RecruitRush.EditorTools
             Debug.Log($"[SETUP] Test build: {report.summary.result}, {report.summary.totalErrors} errors");
             if (report.summary.result != BuildResult.Succeeded) throw new Exception("Build failed");
         });
+
+        /// <summary>
+        /// Builds an ARM64 APK and, with AutoRunPlayer, installs and launches it on the USB-connected phone.
+        /// Pass "-devbuild" for a development build (profiler, logs, autoplay bot).
+        /// </summary>
+        public static void BuildAndroidBatch() => RunBatch(() =>
+        {
+            BuildScene();
+            ApplyAndroidSettings();
+            if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.Android)
+                EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Android, BuildTarget.Android);
+
+            var options = BuildOptions.AutoRunPlayer;
+            if (Environment.GetCommandLineArgs().Contains("-devbuild")) options |= BuildOptions.Development;
+            var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
+            {
+                scenes = new[] { ScenePath },
+                locationPathName = "Builds/Android/RecruitRush.apk",
+                target = BuildTarget.Android,
+                options = options
+            });
+            Debug.Log($"[SETUP] Android build: {report.summary.result}, {report.summary.totalErrors} errors, " +
+                      $"{report.summary.totalSize / (1024 * 1024)} MB");
+            if (report.summary.result != BuildResult.Succeeded) throw new Exception("Android build failed");
+        });
+
+        static void ApplyAndroidSettings()
+        {
+            var android = UnityEditor.Build.NamedBuildTarget.Android;
+            PlayerSettings.SetApplicationIdentifier(android, "com.recruitrush.prototype");
+            PlayerSettings.SetScriptingBackend(android, ScriptingImplementation.IL2CPP);
+            PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
+            PlayerSettings.Android.minSdkVersion = AndroidSdkVersions.AndroidApiLevel26;
+            PlayerSettings.bundleVersion = "0.1.0";
+            PlayerSettings.Android.bundleVersionCode = 1;
+            EditorUserBuildSettings.buildAppBundle = false;
+        }
 
         static void RunBatch(Action action)
         {
