@@ -33,15 +33,16 @@ namespace RecruitRush
         public static int MaxTier => Names.Length - 1;
     }
 
-    public enum UpgradeType { Weapon, FireRate, Damage }
+    public enum UpgradeType { Soldiers, Weapon, FireRate, Damage }
 
     public static class Upgrades
     {
         public const float FireRateStep = 0.25f;
         public const float DamageStep = 0.3f;
 
-        public static string Label(UpgradeType t) => t switch
+        public static string Label(UpgradeType t, int amount = 0) => t switch
         {
+            UpgradeType.Soldiers => "+" + amount,
             UpgradeType.Weapon => "WEAPON UP",
             UpgradeType.FireRate => "FIRE RATE +25%",
             _ => "DAMAGE +30%"
@@ -49,7 +50,8 @@ namespace RecruitRush
 
         public static Color Color(UpgradeType t) => t switch
         {
-            UpgradeType.Weapon => new Color(1f, 0.72f, 0.12f),
+            UpgradeType.Soldiers => new Color(1f, 0.74f, 0.15f),
+            UpgradeType.Weapon => new Color(0.95f, 0.45f, 0.15f),
             UpgradeType.FireRate => new Color(0.2f, 0.75f, 0.85f),
             _ => new Color(0.85f, 0.35f, 0.85f)
         };

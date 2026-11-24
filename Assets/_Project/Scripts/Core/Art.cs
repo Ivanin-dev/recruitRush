@@ -38,6 +38,8 @@ namespace RecruitRush
             Cache.Clear();
         }
 
+        public static GameAssets Assets => assets;
+
         public static Font Font => font ? font : (font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"));
 
         public static Material Lit(Color c) => Get(c, 0);
@@ -99,6 +101,50 @@ namespace RecruitRush
     public static class UnitFactory
     {
         static readonly Color GunMetal = new(0.12f, 0.12f, 0.12f);
+        static readonly Dictionary<GameObject, float> ModelScale = new();
+        public const float SoldierHeight = 0.95f;
+
+        /// <summary>
+        /// Instantiates an imported character prefab under a fresh root, normalized to <paramref name="height"/>
+        /// meters and playing the shared run loop with a random phase so the crowd doesn't march in lockstep.
+        /// </summary>
+        public static Transform Model(Transform parent, GameObject prefab, float height = SoldierHeight)
+        {
+            var root = new GameObject("Soldier").transform;
+            root.SetParent(parent, false);
+            var model = Object.Instantiate(prefab, root, false);
+            model.transform.localPosition = Vector3.zero;
+            model.transform.localRotation = Quaternion.identity;
+
+            if (!ModelScale.TryGetValue(prefab, out float scale))
+            {
+                float h = 0f;
+                foreach (var r in model.GetComponentsInChildren<Renderer>()) h = Mathf.Max(h, r.bounds.max.y - root.position.y);
+                scale = h > 0.01f ? height / h : 1f;
+                ModelScale[prefab] = scale;
+            }
+            model.transform.localScale = Vector3.one * scale;
+
+            foreach (var r in model.GetComponentsInChildren<Renderer>())
+            {
+                r.shadowCastingMode = ShadowCastingMode.On;
+                r.receiveShadows = false;
+            }
+            var animator = model.GetComponentInChildren<Animator>();
+            if (!animator) animator = model.AddComponent<Animator>();
+            var controller = Art.Assets ? Art.Assets.soldierAnimator : null;
+            if (controller)
+            {
+                animator.runtimeAnimatorController = controller;
+                animator.applyRootMotion = false;
+                animator.cullingMode = AnimatorCullingMode.CullUpdateTransforms;
+                animator.Play(0, 0, Random.value);
+                animator.speed = Random.Range(0.9f, 1.1f);
+            }
+            return root;
+        }
+
+        public static bool HasModels => Art.Assets && Art.Assets.playerSoldier && Art.Assets.soldierAnimator;
 
         public static Transform Soldier(Transform parent, Color uniform, Color helmet, out Transform gun)
         {

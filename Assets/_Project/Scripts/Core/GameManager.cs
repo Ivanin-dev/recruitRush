@@ -108,11 +108,12 @@ namespace RecruitRush
 
         public void OnEnemyKilled() => Kills++;
 
-        public void ApplyUpgrade(UpgradeType type)
+        public void ApplyUpgrade(UpgradeType type, int amount = 0)
         {
             if (Current != State.Playing) return;
-            Squad.Upgrade(type);
-            string text = type == UpgradeType.Weapon ? Weapons.Names[Squad.Tier] : Upgrades.Label(type);
+            if (type == UpgradeType.Soldiers) Squad.Add(amount);
+            else Squad.Upgrade(type);
+            string text = type == UpgradeType.Weapon ? Weapons.Names[Squad.Tier] : Upgrades.Label(type, amount);
             Debug.Log($"[UPGRADE] {type} -> {Weapons.Names[Squad.Tier]} rate x{Squad.FireRateMul:0.00} dmg x{Squad.DamageMul:0.00}");
             FloatingText.Spawn(Squad.transform, new Vector3(0f, 2.8f, 0f), text, Upgrades.Color(type));
             UI.ShowBanner(text, Upgrades.Color(type));
@@ -121,6 +122,9 @@ namespace RecruitRush
             Haptics.Medium();
             Cam.Shake(0.12f);
         }
+
+        /// <summary>Conveyor speed for a lane: a side corridor is frozen while its barricade stands.</summary>
+        public float LaneSpeed(float x) => Director && Director.IsLaneBlocked(x) ? 0f : WorldSpeed;
 
         public void OnFinalWave()
         {

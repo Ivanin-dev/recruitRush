@@ -20,6 +20,10 @@ namespace RecruitRush
 
         public static readonly Color UniformColor = new(0.36f, 0.45f, 0.25f);
         public static readonly Color HelmetColor = new(0.26f, 0.33f, 0.18f);
+        public static readonly Color CommanderUniform = new(0.18f, 0.32f, 0.6f);
+        public static readonly Color CommanderHelmet = new(0.9f, 0.72f, 0.2f);
+        /// <summary>The commander fires faster and harder than a soldier, so a lone start is playable.</summary>
+        public const float CommanderDamageMul = 3f, CommanderRateMul = 2f;
 
         public int Count { get; private set; }
         public int Tier { get; private set; }
@@ -35,7 +39,7 @@ namespace RecruitRush
         Transform unitsRoot, badge;
         TextMesh badgeText;
         Tracers tracers;
-        float targetX, shotAcc;
+        float targetX, shotAcc, commanderAcc;
 
         float Spacing => Formation.Spacing(units.Count, baseSpacing);
         public float Radius => Formation.Radius(units.Count, Spacing);
@@ -73,6 +77,18 @@ namespace RecruitRush
             CountChanged?.Invoke(n);
         }
 
+        public void AddDamage(float amount)
+        {
+            DamageMul += amount;
+            StatsChanged?.Invoke();
+        }
+
+        public void AddFireRate(float amount)
+        {
+            FireRateMul += amount;
+            StatsChanged?.Invoke();
+        }
+
         public void Upgrade(UpgradeType type)
         {
             switch (type)
@@ -97,7 +113,25 @@ namespace RecruitRush
 
         void SpawnUnit()
         {
-            var root = UnitFactory.Soldier(unitsRoot, UniformColor, HelmetColor, out var gun);
+            // Unit 0 is the commander: bigger, distinct colors, always the last to fall.
+            bool commander = units.Count == 0;
+            Transform root, gun = null;
+            if (UnitFactory.HasModels)
+            {
+                root = UnitFactory.Model(unitsRoot, Art.Assets.playerSoldier, commander ? 1.3f : UnitFactory.SoldierHeight);
+                if (commander) // gold chevron marks the commander inside a big crowd
+                    Art.Box("Marker", root, new Vector3(0f, 1.55f, 0f), new Vector3(0.22f, 0.22f, 0.22f), Art.Glow(CommanderHelmet), Prims.Sphere, false);
+            }
+            else
+            {
+                root = UnitFactory.Soldier(unitsRoot, commander ? CommanderUniform : UniformColor,
+                    commander ? CommanderHelmet : HelmetColor, out gun);
+                if (commander)
+                {
+                    root.localScale = Vector3.one * 1.35f;
+                    Art.Box("Beret", root, new Vector3(0f, 0.9f, 0f), new Vector3(0.28f, 0.08f, 0.28f), Art.Lit(CommanderHelmet), Prims.Cylinder, false);
+                }
+            }
             root.position = transform.position + Formation.Slot(units.Count, Spacing) * 0.3f;
             var u = new Unit { root = root, gun = gun, phase = Random.value * 10f };
             ApplyGun(u);
@@ -115,6 +149,7 @@ namespace RecruitRush
 
         void ApplyGun(Unit u)
         {
+            if (!u.gun) return; // imported models carry their own weapon
             u.gun.localScale = Weapons.GunScale[Tier];
             u.gun.localPosition = Weapons.GunPos[Tier];
             u.gun.GetComponent<MeshRenderer>().sharedMaterial = Art.Lit(Weapons.GunColor[Tier]);
@@ -140,7 +175,7 @@ namespace RecruitRush
                 Vector3 cur = u.root.position;
                 cur.y = 0f;
                 Vector3 np = Vector3.Lerp(cur, target, follow);
-                float bob = running ? Mathf.Abs(Mathf.Sin(time * 13f + u.phase)) * 0.08f : 0f;
+                float bob = running && !u.gun ? 0f : running ? Mathf.Abs(Mathf.Sin(time * 13f + u.phase)) * 0.08f : 0f;
                 u.root.SetPositionAndRotation(new Vector3(np.x, bob, np.z), Quaternion.identity);
             }
 
@@ -151,32 +186,48 @@ namespace RecruitRush
         void Shoot(float dt)
         {
             if (units.Count == 0 || tracers == null) return;
-            shotAcc += units.Count * Weapons.FireRate * FireRateMul * dt;
+            Color color = Weapons.TracerColor[Tier];
+            Vector3 muzzleLocal = Weapons.GunPos[Tier] + new Vector3(0f, 0f, Weapons.GunScale[Tier].z * 0.5f);
+            float baseDamage = Weapons.Damage[Tier] * DamageMul;
+
+            // Commander's own stream.
+            commanderAcc += Weapons.FireRate * CommanderRateMul * FireRateMul * dt;
+            while (commanderAcc >= 1f)
+            {
+                commanderAcc -= 1f;
+                FireOne(units[0].root.TransformPoint(muzzleLocal), baseDamage * CommanderDamageMul, color, true);
+            }
+
+            // Rank and file (the commander is not counted twice).
+            int soldiers = units.Count - 1;
+            if (soldiers <= 0) return;
+            shotAcc += soldiers * Weapons.FireRate * FireRateMul * dt;
             int shots = Mathf.FloorToInt(shotAcc);
             shotAcc -= shots;
             shots = Mathf.Min(shots, 40);
-
-            // Soldiers beyond the visible cap still contribute damage.
-            float damage = Weapons.Damage[Tier] * DamageMul * (Count / (float)units.Count);
-            Color color = Weapons.TracerColor[Tier];
-            Vector3 muzzleLocal = Weapons.GunPos[Tier] + new Vector3(0f, 0f, Weapons.GunScale[Tier].z * 0.5f);
             if (shots > 0) Sfx.Shot(Tier);
 
+            // Soldiers beyond the visible cap still contribute damage.
+            float damage = baseDamage * ((Count - 1) / (float)soldiers);
             for (int s = 0; s < shots; s++)
             {
-                var u = units[Random.Range(0, units.Count)];
-                Vector3 m = u.root.TransformPoint(muzzleLocal);
-                if (s < 12) Fx.Muzzle(m, color);
-                var target = Target.FindAhead(m.x, m.z, range);
-                Vector3 end;
-                if (target)
-                {
-                    end = new Vector3(m.x, target.hitHeight, target.FrontZ);
-                    target.TakeHit(damage);
-                }
-                else end = m + Vector3.forward * range;
-                tracers.Fire(m, end, color);
+                var u = units[Random.Range(1, units.Count)];
+                FireOne(u.root.TransformPoint(muzzleLocal), damage, color, s < 12);
             }
+        }
+
+        void FireOne(Vector3 muzzle, float damage, Color color, bool flash)
+        {
+            if (flash) Fx.Muzzle(muzzle, color);
+            var target = Target.FindAhead(muzzle.x, muzzle.z, range);
+            Vector3 end;
+            if (target)
+            {
+                end = new Vector3(muzzle.x, target.hitHeight, target.FrontZ);
+                target.TakeHit(damage);
+            }
+            else end = muzzle + Vector3.forward * range;
+            tracers.Fire(muzzle, end, color);
         }
     }
 }

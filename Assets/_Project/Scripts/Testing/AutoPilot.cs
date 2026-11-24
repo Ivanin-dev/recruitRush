@@ -66,6 +66,26 @@ namespace RecruitRush
             if (gm.Boss != null) return 0f;
             float sz = gm.Squad.transform.position.z;
             float range = gm.Squad.range;
+
+            // Open the +1 corridor first, then the crate corridor once the squad can afford it.
+            var d = gm.Director;
+            if (d.LeftBarricade && d.LeftBarricade.Alive) return LevelDirector.LeftX;
+            if (gm.Squad.Count < 10) return ThreatOr(sz, LevelDirector.LeftX); // build up first
+            if (d.RightBarricade && d.RightBarricade.Alive) return LevelDirector.RightX;
+            return ChooseLaneX(sz, range);
+        }
+
+        /// <summary>Defend the middle when a pack is close, otherwise go to the fallback lane.</summary>
+        float ThreatOr(float sz, float fallback)
+        {
+            int n = 0;
+            foreach (var target in Target.All)
+                if (target is Enemy && target.Alive && target.FrontZ - sz < 9f && target.FrontZ - sz > -1f) n++;
+            return n >= 2 ? LevelDirector.MidX : fallback;
+        }
+
+        float ChooseLaneX(float sz, float range)
+        {
             int nearEnemies = 0, closeEnemies = 0;
             float enemyX = 0f;
             bool crate = false;

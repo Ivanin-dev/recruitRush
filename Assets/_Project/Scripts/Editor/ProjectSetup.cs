@@ -34,6 +34,7 @@ namespace RecruitRush.EditorTools
             assets.glow = glow;
             assets.fxGlow = MakeParticleMaterial(Root + "/Materials/M_FxGlow.mat", 3f);
             assets.fxSmoke = MakeParticleMaterial(Root + "/Materials/M_FxSmoke.mat", 1f);
+            AssignUnitModels(assets);
             EditorUtility.SetDirty(assets);
             var profile = MakeVolumeProfile(Root + "/Data/VP_Game.asset");
             AssetDatabase.SaveAssets();
@@ -140,6 +141,37 @@ namespace RecruitRush.EditorTools
             }
             EditorUtility.SetDirty(mat);
             return mat;
+        }
+
+        const string ToonyRoot = "Assets/ToonyTinyPeople/TT_ww1_demo";
+
+        /// <summary>Hooks up the Toony Tiny models and a looping run animator when the pack is in the project.</summary>
+        static void AssignUnitModels(GameAssets assets)
+        {
+            assets.playerSoldier = AssetDatabase.LoadAssetAtPath<GameObject>(ToonyRoot + "/prefabs/TT_ww1_demo_british_A.prefab");
+            assets.enemySoldier = AssetDatabase.LoadAssetAtPath<GameObject>(ToonyRoot + "/prefabs/TT_ww1_demo_german_A.prefab");
+            assets.heavySoldier = AssetDatabase.LoadAssetAtPath<GameObject>(ToonyRoot + "/prefabs/TT_ww1_demo_german_B.prefab");
+            var run = AssetDatabase.LoadAllAssetsAtPath(ToonyRoot + "/animation/m_weapon_run.FBX")
+                .OfType<AnimationClip>().FirstOrDefault(c => !c.name.StartsWith("__preview"));
+            if (!assets.playerSoldier || !run)
+            {
+                Debug.Log("[SETUP] Toony Tiny pack not found: units stay as primitives.");
+                assets.soldierAnimator = null;
+                return;
+            }
+
+            const string controllerPath = Root + "/Data/AC_Soldier.controller";
+            var controller = AssetDatabase.LoadAssetAtPath<UnityEditor.Animations.AnimatorController>(controllerPath);
+            if (!controller)
+            {
+                controller = UnityEditor.Animations.AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
+                var state = controller.layers[0].stateMachine.AddState("Run");
+                state.motion = run;
+                state.cycleOffsetParameterActive = false;
+                controller.layers[0].stateMachine.defaultState = state;
+            }
+            assets.soldierAnimator = controller;
+            Debug.Log("[SETUP] Toony Tiny models assigned.");
         }
 
         /// <summary>Alpha-blended URP Particles/Unlit; intensity above 1 makes it bloom.</summary>

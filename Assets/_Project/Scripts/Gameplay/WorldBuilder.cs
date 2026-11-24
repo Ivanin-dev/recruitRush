@@ -61,10 +61,20 @@ namespace RecruitRush
             for (int i = 0; i < 3; i++)
                 Art.Box("Lane", root, new Vector3(lanes[i], -0.01f, mid), new Vector3(2.7f, 0.02f, len), Art.Lit(tints[i]), null, false);
 
+            // Corridor walls between the lanes, from the barricade line to the horizon.
+            float wallStart = LevelDirector.ExitZ - 0.4f, wallLen = 80f;
+            foreach (int s in Sides)
+            {
+                Art.Box("CorridorWall", root, new Vector3(s * 1.5f, 0.45f, wallStart + wallLen * 0.5f), new Vector3(0.3f, 0.9f, wallLen), Art.Lit(Concrete));
+                Art.Box("WallCap", root, new Vector3(s * 1.5f, 0.92f, wallStart + wallLen * 0.5f), new Vector3(0.38f, 0.06f, wallLen), Art.Lit(new Color(0.62f, 0.6f, 0.56f)), null, false);
+                Art.Box("WallEnd", root, new Vector3(s * 1.5f, 0.6f, wallStart), new Vector3(0.45f, 1.2f, 0.45f), Art.Lit(new Color(0.4f, 0.42f, 0.42f)));
+            }
+
             for (float z = MinZ; z < MinZ + Period; z += 3f)
             {
                 foreach (int s in Sides)
                 {
+                    // Lane dashes scroll underneath the walls; only the stretch in front of the squad shows them.
                     var dash = Art.Box("Dash", root, new Vector3(s * 1.5f, 0.005f, z), new Vector3(0.12f, 0.02f, 1.6f), Art.Lit(LineColor), null, false);
                     scroller.Add(dash.transform);
                     var barrier = Art.Box("Barrier", root, new Vector3(s * (HalfWidth + 0.4f), 0.35f, z), new Vector3(0.45f, 0.7f, 2.6f), Art.Lit(Concrete));

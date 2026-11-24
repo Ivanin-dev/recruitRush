@@ -12,5 +12,11 @@ namespace RecruitRush
         public Material fxGlow;
         [Tooltip("Transparent URP particle material (smoke, dust).")]
         public Material fxSmoke;
+
+        [Header("Unit models (optional: falls back to primitives when empty)")]
+        public GameObject playerSoldier;
+        public GameObject enemySoldier;
+        public GameObject heavySoldier;
+        public RuntimeAnimatorController soldierAnimator;
     }
 }

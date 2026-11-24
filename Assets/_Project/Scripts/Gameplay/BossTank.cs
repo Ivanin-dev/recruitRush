@@ -16,7 +16,8 @@ namespace RecruitRush
         public bool Dead => !Alive;
         public event System.Action Died;
 
-        float interval, fireTimer, stopZ;
+        float interval, fireTimer, stopZ, pendingDamage, popTimer;
+        static readonly Color DamageColor = new(1f, 0.9f, 0.4f);
         int killsPerShot;
         PlayerSquad squad;
         Transform turret, muzzle, hpBar, hpFill;
@@ -77,6 +78,7 @@ namespace RecruitRush
         {
             if (!Alive) return;
             Hp = Mathf.Max(0f, Hp - damage);
+            pendingDamage += damage;
             UpdateBar();
             if (Random.value < 0.15f)
                 Fx.Sparks(transform.position + new Vector3(Random.Range(-1.4f, 1.4f), Random.Range(0.8f, 2f), -depth),
@@ -94,6 +96,15 @@ namespace RecruitRush
 
         void Update()
         {
+            // Damage numbers, batched so the screen shows a readable "-179" instead of a blur.
+            popTimer += Time.deltaTime;
+            if (pendingDamage >= 1f && popTimer >= 0.3f)
+            {
+                FloatingText.Spawn(transform, new Vector3(Random.Range(-1.2f, 1.2f), 3.2f, 0f), "-" + Mathf.RoundToInt(pendingDamage), DamageColor);
+                pendingDamage = 0f;
+                popTimer = 0f;
+            }
+
             var gm = GameManager.I;
             if (!Alive || squad == null || !gm || gm.WorldSpeed <= 0f) return;
             float dt = Time.deltaTime;

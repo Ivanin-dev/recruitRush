@@ -21,8 +21,10 @@ namespace RecruitRush
             var p = go.AddComponent<Pickup>();
             p.value = value;
             p.squad = squad;
+            bool big = value > 1;
             Art.Box("Frame", go.transform, new Vector3(0f, 0.4f, 0f), new Vector3(1.55f, 0.8f, 0.95f), Art.Lit(FrameColor));
-            Art.Box("Box", go.transform, new Vector3(0f, 0.45f, 0f), new Vector3(1.4f, 0.82f, 0.85f), Art.Lit(BoxColor), null, false);
+            Art.Box("Box", go.transform, new Vector3(0f, 0.45f, 0f), new Vector3(1.4f, 0.82f, 0.85f),
+                big ? Art.Glow(new Color(1f, 0.7f, 0.15f)) : Art.Lit(BoxColor), null, false);
             var label = Art.Text("Label", go.transform, new Vector3(0f, 0.9f, -0.05f), "+" + value, 0.55f, Color.white);
             label.transform.localRotation = Quaternion.Euler(55f, 0f, 0f);
             return p;
@@ -33,7 +35,7 @@ namespace RecruitRush
             var gm = GameManager.I;
             if (!gm || squad == null || taken) return;
             Vector3 p = transform.position;
-            p.z -= gm.WorldSpeed * Time.deltaTime;
+            p.z -= gm.LaneSpeed(p.x) * Time.deltaTime;
             transform.position = p;
 
             Vector3 sp = squad.transform.position;
@@ -61,7 +63,9 @@ namespace RecruitRush
         }
     }
 
-    /// <summary>Middle lane: an enemy soldier running at the squad. Kills one soldier on contact.</summary>
+    public enum EnemyKind { Grunt, Runner, Heavy }
+
+    /// <summary>Middle lane: an enemy soldier running straight down. Costs soldiers if it rams or breaks through.</summary>
     public class Enemy : Target
     {
         public static readonly Color UniformColor = new(0.62f, 0.18f, 0.15f);
@@ -71,27 +75,88 @@ namespace RecruitRush
 
         float hp, runSpeed, phase, flashTime;
         PlayerSquad squad;
-        MeshRenderer[] renderers;
+        Renderer[] renderers;
         Material[] originals;
 
-        public static Enemy Spawn(Transform parent, Vector3 pos, float hp, float runSpeed, PlayerSquad squad)
+        static readonly Color RunnerUniform = new(0.9f, 0.48f, 0.15f);
+        static readonly Color RunnerHelmet = new(0.55f, 0.25f, 0.08f);
+        static readonly Color HeavyUniform = new(0.36f, 0.3f, 0.32f);
+        static readonly Color HeavyHelmet = new(0.2f, 0.2f, 0.22f);
+        static readonly Color ArmorPing = new(0.75f, 0.85f, 1f);
+
+        public EnemyKind Kind { get; private set; }
+        float armor;
+        int breachCost = 1;
+        TextMesh hpLabel;
+
+        public static Enemy Spawn(Transform parent, Vector3 pos, float hp, float runSpeed, PlayerSquad squad,
+            EnemyKind kind = EnemyKind.Grunt)
         {
-            var go = new GameObject("Enemy");
+            var go = new GameObject("Enemy" + kind);
             go.transform.SetParent(parent, false);
             go.transform.position = pos;
             var e = go.AddComponent<Enemy>();
-            e.hp = hp;
-            e.runSpeed = runSpeed;
+            e.Kind = kind;
             e.squad = squad;
             e.halfWidth = 0.4f;
             e.depth = 0.2f;
             e.hitHeight = 0.5f;
             e.phase = Random.value * 10f;
-            var model = UnitFactory.Soldier(go.transform, UniformColor, HelmetColor, out _);
+
+            Color uniform = UniformColor, helmet = HelmetColor;
+            float scale = 1f;
+            switch (kind)
+            {
+                case EnemyKind.Runner: // fast and fragile: must be caught before it breaks through
+                    hp *= 0.6f;
+                    runSpeed += 3f;
+                    scale = 0.8f;
+                    uniform = RunnerUniform;
+                    helmet = RunnerHelmet;
+                    break;
+                case EnemyKind.Heavy: // slow and armored: needs damage per bullet, not bullet count
+                    hp *= 6f;
+                    runSpeed = Mathf.Max(0.5f, runSpeed - 1.2f);
+                    scale = 1.45f;
+                    uniform = HeavyUniform;
+                    helmet = HeavyHelmet;
+                    e.armor = 1.5f;
+                    e.breachCost = 3;
+                    e.halfWidth = 0.55f;
+                    e.hitHeight = 0.7f;
+                    break;
+            }
+            e.hp = hp;
+            e.runSpeed = runSpeed;
+
+            Transform model;
+            if (UnitFactory.HasModels)
+            {
+                var assets = Art.Assets;
+                model = UnitFactory.Model(go.transform, kind == EnemyKind.Heavy && assets.heavySoldier ? assets.heavySoldier : assets.enemySoldier);
+                if (kind == EnemyKind.Runner) // orange armband so runners read at a glance
+                    Art.Box("Band", model, new Vector3(0f, 0.55f, 0f), new Vector3(0.4f, 0.08f, 0.32f), Art.Glow(RunnerUniform), null, false);
+            }
+            else
+            {
+                model = UnitFactory.Soldier(go.transform, uniform, helmet, out _);
+                if (kind == EnemyKind.Heavy)
+                    Art.Box("Armor", model, new Vector3(0f, 0.45f, 0.05f), new Vector3(0.42f, 0.36f, 0.36f), Art.Lit(HeavyHelmet), null, false);
+            }
             model.localRotation = Quaternion.Euler(0f, 180f, 0f);
-            e.renderers = go.GetComponentsInChildren<MeshRenderer>();
-            e.originals = new Material[e.renderers.Length];
-            for (int i = 0; i < e.renderers.Length; i++) e.originals[i] = e.renderers[i].sharedMaterial;
+            go.transform.localScale = Vector3.one * scale;
+
+            // Collect renderers for the hit flash before adding any text.
+            var all = go.GetComponentsInChildren<Renderer>();
+            e.renderers = all;
+            e.originals = new Material[all.Length];
+            for (int i = 0; i < all.Length; i++) e.originals[i] = all[i].sharedMaterial;
+
+            if (kind == EnemyKind.Heavy)
+            {
+                e.hpLabel = Art.Text("Hp", go.transform, new Vector3(0f, 1.25f, 0f), Mathf.CeilToInt(hp).ToString(), 0.3f, Color.white);
+                e.hpLabel.gameObject.AddComponent<Billboard>();
+            }
             return e;
         }
 
@@ -114,18 +179,21 @@ namespace RecruitRush
             Vector3 p = transform.position;
             Vector3 sp = squad.transform.position;
 
+            // Straight down the middle lane: no chasing.
             p.z -= (gm.WorldSpeed + runSpeed) * dt;
-            float dx = sp.x - p.x;
-            float chase = p.z - sp.z < 20f ? 2.6f : 0.5f;
-            p.x += Mathf.Clamp(dx, -chase * dt, chase * dt);
             p.y = Mathf.Abs(Mathf.Sin(Time.time * 12f + phase)) * 0.08f;
             transform.position = p;
 
-            if (squad.Count > 0 && p.z - sp.z < squad.Radius * 0.7f && Mathf.Abs(dx) < squad.Radius + 0.2f)
+            float dx = Mathf.Abs(sp.x - p.x);
+            bool rammed = p.z - sp.z < squad.Radius * 0.7f && dx < squad.Radius + 0.2f;
+            bool breached = p.z < sp.z - 0.5f; // got past the squad's line unkilled
+            if (squad.Count > 0 && (rammed || breached))
             {
                 Alive = false;
-                squad.SetCount(squad.Count - 1, p);
-                ExplosionFX.Spawn(p + Vector3.up * 0.5f, 0.5f, false);
+                // A breach only costs rank and file; a lone commander survives it (ramming still hurts).
+                int cost = rammed ? breachCost : Mathf.Min(breachCost, squad.Count - 1);
+                if (cost > 0) squad.SetCount(squad.Count - cost, rammed ? p : sp + Vector3.forward);
+                Fx.Sparks(rammed ? p + Vector3.up * 0.5f : new Vector3(p.x, 0.6f, sp.z), new Color(1f, 0.3f, 0.25f), 8);
                 Destroy(gameObject);
             }
             else if (p.z < sp.z - 6f) Destroy(gameObject);
@@ -134,13 +202,17 @@ namespace RecruitRush
         public override void TakeHit(float damage)
         {
             if (!Alive) return;
-            hp -= damage;
-            Vector3 chest = transform.position + Vector3.up * 0.5f + Vector3.back * 0.2f;
+            // Armor soaks a flat amount per bullet: weak guns barely scratch heavies.
+            float dealt = armor > 0f ? Mathf.Max(damage - armor, damage * 0.15f) : damage;
+            hp -= dealt;
+            if (hpLabel) hpLabel.text = Mathf.Max(0, Mathf.CeilToInt(hp)).ToString();
+            Vector3 chest = transform.position + Vector3.up * (0.5f * transform.localScale.y) + Vector3.back * 0.2f;
             if (hp > 0f)
             {
                 if (flashTime <= 0f) SetFlash(true);
                 flashTime = 0.06f;
-                if (Random.value < 0.35f) Fx.Sparks(chest, HitSpark, 2);
+                bool deflected = dealt < damage * 0.5f;
+                if (Random.value < 0.35f) Fx.Sparks(chest, deflected ? ArmorPing : HitSpark, 2);
                 return;
             }
             Alive = false;
@@ -153,42 +225,54 @@ namespace RecruitRush
         }
     }
 
-    /// <summary>Right lane: a sturdy crate. Shoot it down for an upgrade before it reaches the squad.</summary>
+    /// <summary>
+    /// Right lane: a sturdy crate. Shoot it down before it reaches the squad: mostly big "+N soldiers",
+    /// sometimes a weapon / fire-rate / damage upgrade.
+    /// </summary>
     public class UpgradeCrate : Target
     {
         static readonly Color Wood = new(0.45f, 0.33f, 0.2f);
 
         UpgradeType type;
+        int amount;
         float hp;
         PlayerSquad squad;
         TextMesh hpText;
         Transform body;
         float punch;
 
-        public static UpgradeCrate Spawn(Transform parent, Vector3 pos, UpgradeType type, float hp, PlayerSquad squad)
+        public static UpgradeCrate Spawn(Transform parent, Vector3 pos, UpgradeType type, float hp, PlayerSquad squad, int amount = 0)
         {
             var go = new GameObject("UpgradeCrate");
             go.transform.SetParent(parent, false);
             go.transform.position = pos;
             var c = go.AddComponent<UpgradeCrate>();
             c.type = type;
+            c.amount = amount;
             c.hp = hp;
             c.squad = squad;
-            c.halfWidth = 1.3f;
-            c.depth = 0.85f;
-            c.hitHeight = 0.9f;
+            c.halfWidth = 1.15f;
+            c.depth = 0.6f;
+            c.hitHeight = 0.7f;
 
             c.body = new GameObject("Body").transform;
             c.body.SetParent(go.transform, false);
             Color col = Upgrades.Color(type);
-            Art.Box("Crate", c.body, new Vector3(0f, 0.85f, 0f), new Vector3(2.5f, 1.7f, 1.7f), Art.Lit(col));
+            Art.Box("Crate", c.body, new Vector3(0f, 0.62f, 0f), new Vector3(2.2f, 1.25f, 1.2f), Art.Lit(col));
             foreach (int s in new[] { -1, 1 })
-                Art.Box("Frame", c.body, new Vector3(s * 1.2f, 0.85f, -0.02f), new Vector3(0.18f, 1.78f, 1.78f), Art.Lit(Wood), null, false);
-            Art.Box("FrameTop", c.body, new Vector3(0f, 1.7f, -0.02f), new Vector3(2.6f, 0.16f, 1.78f), Art.Lit(Wood), null, false);
+                Art.Box("Frame", c.body, new Vector3(s * 1.06f, 0.62f, -0.02f), new Vector3(0.16f, 1.32f, 1.26f), Art.Lit(Wood), null, false);
+            Art.Box("FrameTop", c.body, new Vector3(0f, 1.25f, -0.02f), new Vector3(2.28f, 0.14f, 1.26f), Art.Lit(Wood), null, false);
 
-            c.hpText = Art.Text("Hp", c.body, new Vector3(0f, 0.85f, -0.9f), Mathf.CeilToInt(hp).ToString(), 0.9f, Color.white);
-            var label = Art.Text("Label", go.transform, new Vector3(0f, 2.3f, 0f), Upgrades.Label(type), 0.42f, col);
-            label.gameObject.AddComponent<Billboard>();
+            // Soldier crates advertise the reward on the face and the HP above; upgrades the other way round.
+            bool soldiers = type == UpgradeType.Soldiers;
+            var face = Art.Text("Face", c.body, new Vector3(0f, 0.95f, -0.3f),
+                soldiers ? Upgrades.Label(type, amount) : Mathf.CeilToInt(hp).ToString(), 0.62f, Color.white);
+            face.transform.localRotation = Quaternion.Euler(50f, 0f, 0f);
+            var top = Art.Text("Top", go.transform, new Vector3(0f, 1.85f, 0f),
+                soldiers ? Mathf.CeilToInt(hp).ToString() : Upgrades.Label(type, amount), soldiers ? 0.38f : 0.36f,
+                soldiers ? Color.white : col);
+            top.gameObject.AddComponent<Billboard>();
+            c.hpText = soldiers ? top : face;
             return c;
         }
 
@@ -197,7 +281,7 @@ namespace RecruitRush
             var gm = GameManager.I;
             if (!Alive || squad == null || !gm) return;
             Vector3 p = transform.position;
-            p.z -= gm.WorldSpeed * 0.65f * Time.deltaTime; // heavy: slower than the conveyor, more time to shoot
+            p.z -= gm.LaneSpeed(p.x) * 0.65f * Time.deltaTime; // heavy: slower than the conveyor, more time to shoot
             transform.position = p;
 
             punch = Mathf.MoveTowards(punch, 0f, Time.deltaTime * 6f);
@@ -230,7 +314,7 @@ namespace RecruitRush
             Sfx.Boom(1.2f);
             Haptics.Medium();
             var gm = GameManager.I;
-            if (gm) gm.ApplyUpgrade(type);
+            if (gm) gm.ApplyUpgrade(type, amount);
             Destroy(gameObject);
         }
     }
