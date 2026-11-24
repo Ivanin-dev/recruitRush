@@ -81,7 +81,7 @@ namespace RecruitRush
             UI.ShowHint("HOLD & DRAG TO MOVE");
             Squad.StatsChanged += () => UI.SetStats(Squad);
 
-            Debug.Log($"[LEVEL] {Level}: duration={Config.duration}s combat {Config.combatSeconds}s / lull {Config.lullSeconds}s cap={Config.activeCap} turrets={Config.turretTimes.Length} bossHp={Config.bossHp}");
+            Debug.Log($"[LEVEL] {Level}: duration={Config.duration}s segments={Config.segments.Count} cap={Config.activeCap} turrets={Config.turretTimes.Length} bossHp={Config.bossHp}");
             if (Debug.isDebugBuild && CommandLine.Has("-autoplay")) gameObject.AddComponent<AutoPilot>();
         }
 

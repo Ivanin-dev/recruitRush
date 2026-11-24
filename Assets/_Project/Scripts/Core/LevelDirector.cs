@@ -1,109 +1,125 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 
 namespace RecruitRush
 {
     public enum LevelPhase { Warmup, Pressure, Climax, Final, Boss }
-    public enum WaveFormation { Line, Wedge, Block, Ambush, Swarm, HeavySquad, EliteSpearhead }
+    public enum SegmentKind { Trickle, Wave, Window, FinalWave }
+    public enum WaveMix { Rush, Line, Combo, SwarmHeavy, Final }
+
+    /// <summary>One stretch of the level timeline.</summary>
+    public struct Segment
+    {
+        public SegmentKind kind;
+        public float start, end;  // seconds
+        public int count;         // enemies in the wave (waves only)
+        public WaveMix mix;
+        public float pressure;    // share of squad DPS the wave's total HP is sized to
+    }
 
     /// <summary>
-    /// Per-level tuning.
-    ///   Waves are sized by the squad's live DPS, not by constants:
-    ///     enemy HP sent per second  = pressure × squad DPS        (pressure 0.3 warm-up → 0.6 climax, + level bonus)
-    ///     formation budget          = pressure × squad DPS × 1.5 s
-    ///   so a small squad isn't shredded and a big one is still pushed.
-    ///   At most <see cref="activeCap"/> enemies live at once; when a wave wants more, the ones that spawn get the extra HP.
-    ///   enemy base HP = 0.8 + 0.15·(level-1), ×(1 + 1.5·t01) within the level.  boss HP = 2500 × (1 + 0.35·(level-1)).
+    /// Per-level tuning. A ~30 s run is a script of segments:
+    ///   0–5 s trickle (1–2 weak targets every ~1.7 s) → wave 1 (12–14, ~3 s) → 1.5 s window →
+    ///   wave (12–14) → window → wave 2 combo (18–22) → window → combo (18–22) → window → final (22–26) → boss.
+    /// Waves spawn in rows of 3–5 every 0.12–0.25 s. Windows only send light scouts (~1/s) so the gun never idles
+    /// but the player can look at gates. Wave HP is sized to the squad's live DPS:
+    ///   HP per grunt = max(base(t), pressure × DPS × duration / weightedCount)    (heavy = 6, runner = 0.6)
+    /// At most <see cref="activeCap"/> enemies live at once; rows wait while the cap is reached.
     /// </summary>
     public class LevelConfig
     {
         public int level;
-        public int startCount = 1; // the commander alone
-        public float duration;     // run length before the final wave (30–40 s)
-        public float pickupInterval;
+        public int startCount = 1;
+        public float duration;
+        public float pickupInterval = 0.3f;
         public int bigPickupEvery = 14;
         public float enemyHp;
         public float enemyRunSpeed;
-        public float crateInterval;
+        public float crateInterval = 4f;
         public float crateBaseHp;
         public float leftBarricadeHp, rightBarricadeHp;
-        public float combatSeconds = 3.5f;   // a burst of fighting...
-        public float lullSeconds = 1.8f;     // ...then a breather to collect and aim at gates
-        public float rowInterval = 0.35f;
-        public int activeCap = 45;
-        public float levelPressureBonus;
-        public float[] gateTimes;          // t01 marks for shootable gates
-        public float[] turretTimes;        // t01 marks for MG nests
+        public int activeCap = 32;
+        public float[] gateTimes;
+        public float[] turretTimes;
         public float turretHp;
-        public float finalWaveSeconds = 4f;
         public float bossHp;
         public int bossKills;
         public float bossInterval = 1.5f;
+        public readonly List<Segment> segments = new();
 
         public float T01(float t) => Mathf.Clamp01(t / duration);
         public float EnemyHpAt(float t) => enemyHp * (1f + 1.5f * T01(t));
 
-        public LevelPhase PhaseAt(float t)
-        {
-            float k = T01(t);
-            return k < 0.25f ? LevelPhase.Warmup : k < 0.75f ? LevelPhase.Pressure : k < 1f ? LevelPhase.Climax : LevelPhase.Final;
-        }
-
-        /// <summary>Fraction of the squad's DPS the enemies "spend" per second.</summary>
-        public float Pressure(LevelPhase p) => levelPressureBonus + p switch
-        {
-            LevelPhase.Warmup => 0.3f,
-            LevelPhase.Pressure => 0.45f,
-            LevelPhase.Climax => 0.6f,
-            _ => 0.8f
-        };
-
         public static LevelConfig For(int level)
         {
             float k = level - 1;
-            return new LevelConfig
+            var c = new LevelConfig
             {
                 level = level,
-                duration = 30f + 2f * Mathf.Min(k, 5f),
-                pickupInterval = 0.3f,
                 enemyHp = 0.8f + k * 0.15f,
-                enemyRunSpeed = 2f + Mathf.Min(k * 0.1f, 1.5f),
-                crateInterval = 4f,
+                enemyRunSpeed = 2.5f + Mathf.Min(k * 0.1f, 1.5f),
                 crateBaseHp = 15f * (1f + k * 0.25f),
                 leftBarricadeHp = 6f * (1f + k * 0.3f),
                 rightBarricadeHp = 30f * (1f + k * 0.3f),
-                levelPressureBonus = Mathf.Min(0.25f, k * 0.03f),
-                gateTimes = new[] { 0.2f, 0.45f, 0.7f },
-                turretTimes = level >= 2 ? new[] { 0.4f, 0.8f } : new[] { 0.6f },
                 turretHp = 120f * (1f + k * 0.35f),
                 bossHp = Mathf.Round(2500f * (1f + k * 0.35f) / 10f) * 10f,
                 bossKills = 2 + level / 2,
             };
+
+            float bonus = Mathf.Min(0.2f, k * 0.03f);
+            int more = Mathf.Min(6, level - 1); // later levels: a few more bodies per wave
+            float t = 0f;
+            void Add(SegmentKind kind, float len, int count = 0, WaveMix mix = WaveMix.Rush, float pressure = 0f)
+            {
+                c.segments.Add(new Segment { kind = kind, start = t, end = t + len, count = count, mix = mix, pressure = pressure + bonus });
+                t += len;
+            }
+            Add(SegmentKind.Trickle, 5f);
+            Add(SegmentKind.Wave, 3f, 12 + more, WaveMix.Rush, 0.45f);
+            Add(SegmentKind.Window, 1.5f);
+            Add(SegmentKind.Wave, 3f, 14 + more, WaveMix.Line, 0.45f);
+            Add(SegmentKind.Window, 1.5f);
+            Add(SegmentKind.Wave, 3f, 18 + more, WaveMix.Combo, 0.55f);
+            Add(SegmentKind.Window, 1.5f);
+            Add(SegmentKind.Wave, 3f, 20 + more, WaveMix.SwarmHeavy, 0.55f);
+            Add(SegmentKind.Window, 1.5f);
+            Add(SegmentKind.FinalWave, 6f, 24 + more, WaveMix.Final, 0.7f);
+            c.duration = t; // ~29 s, then the boss
+
+            c.gateTimes = new[] { 0.17f, 0.42f, 0.66f };
+            c.turretTimes = level >= 2 ? new[] { 0.35f, 0.62f } : new[] { 0.5f };
+            return c;
         }
     }
 
     /// <summary>
-    /// Runs a level in phases. Left corridor: +1 stream. Right corridor: soldier crates and shootable gates.
-    /// Middle: combat bursts (background column + one tactical formation) separated by short lulls.
-    /// Warm-up (0–25%) → Pressure (25–75%) → Climax (75–100%, elites) → Final wave → Boss.
+    /// Plays the level script. Left corridor: +1 stream. Right corridor: soldier crates and shootable gates.
+    /// Middle: trickle → waves separated by short scout windows → final wave → boss.
     /// </summary>
     public class LevelDirector : MonoBehaviour
     {
         public const float LeftX = -5.9f, MidX = 0f, RightX = 5.9f, SpawnZ = 62f, ExitZ = 12f;
         public const float CorridorWidth = 5f;
-        const float MinDps = 12f; // the lone commander's output; waves never size below it
+        const float MinDps = 12f;
+
+        struct Order
+        {
+            public EnemyKind kind;
+            public float x;
+        }
 
         public LevelConfig Config { get; private set; }
         public float Time01 => Config.T01(t);
         public LevelPhase Phase { get; private set; }
         public bool FinalPhase => Phase >= LevelPhase.Final;
-        public bool InLull { get; private set; }
         public Barricade LeftBarricade { get; private set; }
         public Barricade RightBarricade { get; private set; }
 
         PlayerSquad squad;
         Transform field;
-        float t, nextPickup, nextRow = 3f, nextCrate, windowEnd = 3f, phaseEnd, rowHpAcc;
-        int crateIndex, pickupCount, gateIndex, turretIndex, waveIndex;
+        float t, nextPickup, nextCrate, nextScout = 1f, nextRow, rowGap, waveHp, bossAt = -1f;
+        int crateIndex, pickupCount, gateIndex, turretIndex, segmentIndex = -1;
+        readonly Queue<Order> queue = new();
 
         public static LevelDirector Create(Transform field, LevelConfig cfg, PlayerSquad squad)
         {
@@ -113,7 +129,6 @@ namespace RecruitRush
             d.squad = squad;
             d.LeftBarricade = Barricade.Spawn(field, new Vector3(LeftX, 0f, ExitZ), cfg.leftBarricadeHp, CorridorWidth + 0.2f);
             d.RightBarricade = Barricade.Spawn(field, new Vector3(RightX, 0f, ExitZ), cfg.rightBarricadeHp, CorridorWidth + 0.2f);
-            // Corridors start full, queued behind their barricades.
             for (float z = ExitZ + 1.3f; z < SpawnZ; z += 2f)
                 Pickup.Spawn(field, new Vector3(LeftX, 0f, z), 1, squad);
             for (float z = ExitZ + 1.4f; z < SpawnZ; z += 10f)
@@ -136,78 +151,123 @@ namespace RecruitRush
             if (!gm || gm.Current != GameManager.State.Playing) return;
             t += Time.deltaTime;
 
-            if (Phase < LevelPhase.Final)
+            if (Phase < LevelPhase.Boss)
             {
-                var p = Config.PhaseAt(t);
-                if (p != Phase) EnterPhase(p, gm);
+                SideLanes();
+                AdvanceSegment(gm);
+                RunSegment();
+                DrainQueue();
+                if (turretIndex < Config.turretTimes.Length && Time01 >= Config.turretTimes[turretIndex])
+                {
+                    turretIndex++;
+                    Turret.Spawn(field, new Vector3(MidX + Random.Range(-1.2f, 1.2f), 0f, SpawnZ), Config.turretHp,
+                        squad.transform.position.z + Random.Range(20f, 26f), Mathf.Max(0.35f, 0.6f - Config.level * 0.03f), squad);
+                }
+                if (t >= Config.duration && queue.Count == 0)
+                {
+                    Phase = LevelPhase.Boss;
+                    bossAt = t + 2.5f;
+                }
             }
-
-            switch (Phase)
+            else if (bossAt > 0f && t >= bossAt)
             {
-                case LevelPhase.Warmup:
-                case LevelPhase.Pressure:
-                case LevelPhase.Climax:
-                    SideLanes();
-                    CombatCycle();
-                    if (turretIndex < Config.turretTimes.Length && Time01 >= Config.turretTimes[turretIndex])
-                    {
-                        turretIndex++;
-                        Turret.Spawn(field, new Vector3(MidX + Random.Range(-1.2f, 1.2f), 0f, SpawnZ), Config.turretHp,
-                            squad.transform.position.z + Random.Range(20f, 26f), Mathf.Max(0.35f, 0.6f - Config.level * 0.03f), squad);
-                    }
-                    break;
-                case LevelPhase.Final:
-                    SideLanes();
-                    BackgroundColumn(); // no lulls in the final wave
-                    if (t >= phaseEnd)
-                    {
-                        Phase = LevelPhase.Boss;
-                        phaseEnd = t + 3f;
-                    }
-                    break;
-                case LevelPhase.Boss:
-                    if (phaseEnd > 0f && t >= phaseEnd)
-                    {
-                        phaseEnd = -1f;
-                        var boss = BossTank.Create(field, new Vector3(MidX, 0f, SpawnZ + 6f), Config.bossHp, Config.bossKills,
-                            Config.bossInterval, squad.transform.position.z + 15f, squad);
-                        gm.OnBossSpawned(boss);
-                    }
-                    break;
+                bossAt = -1f;
+                var boss = BossTank.Create(field, new Vector3(MidX, 0f, SpawnZ + 6f), Config.bossHp, Config.bossKills,
+                    Config.bossInterval, squad.transform.position.z + 15f, squad);
+                gm.OnBossSpawned(boss);
             }
         }
 
-        void EnterPhase(LevelPhase p, GameManager gm)
+        void AdvanceSegment(GameManager gm)
         {
-            Phase = p;
-            Debug.Log($"[PHASE] {p} at t={t:0.0}s squad={squad.Count} dps={squad.Dps:0}");
-            if (p == LevelPhase.Climax) gm.UI.ShowBanner("ELITES INCOMING!", new Color(1f, 0.6f, 0.2f));
-            if (p == LevelPhase.Final)
+            var segs = Config.segments;
+            while (segmentIndex + 1 < segs.Count && t >= segs[segmentIndex + 1].start)
             {
-                phaseEnd = t + Config.finalWaveSeconds;
-                InLull = false;
-                gm.OnFinalWave();
+                segmentIndex++;
+                var s = segs[segmentIndex];
+                Phase = s.kind == SegmentKind.FinalWave ? LevelPhase.Final
+                    : s.kind == SegmentKind.Trickle ? LevelPhase.Warmup
+                    : s.mix is WaveMix.Combo or WaveMix.SwarmHeavy ? LevelPhase.Climax : LevelPhase.Pressure;
+                if (s.kind is SegmentKind.Wave or SegmentKind.FinalWave) StartWave(s);
+                if (s.kind == SegmentKind.FinalWave) gm.OnFinalWave();
+                if (s.mix == WaveMix.Combo && s.kind == SegmentKind.Wave) gm.UI.ShowBanner("ELITES INCOMING!", new Color(1f, 0.6f, 0.2f));
+                Debug.Log($"[SEG] {s.kind} {s.mix} at t={t:0.0}s squad={squad.Count} dps={squad.Dps:0}");
             }
         }
 
-        /// <summary>Alternates combat bursts and lulls. Each burst opens with a formation (after warm-up).</summary>
-        void CombatCycle()
+        /// <summary>Trickle and windows keep a light stream of scouts going so the gun never idles.</summary>
+        void RunSegment()
         {
-            if (t >= windowEnd)
-            {
-                InLull = !InLull;
-                windowEnd = t + (InLull ? Config.lullSeconds : Config.combatSeconds);
-                if (!InLull && Phase != LevelPhase.Warmup) SpawnWave(PickFormation());
-            }
-            if (!InLull) BackgroundColumn();
+            if (segmentIndex < 0) return;
+            var s = Config.segments[segmentIndex];
+            if (s.kind != SegmentKind.Trickle && s.kind != SegmentKind.Window) return;
+            if (t < nextScout) return;
+            bool trickle = s.kind == SegmentKind.Trickle;
+            nextScout = t + (trickle ? Random.Range(1.5f, 2f) : Random.Range(0.8f, 1.1f));
+            int n = trickle ? Random.Range(1, 3) : 1;
+            for (int i = 0; i < n; i++)
+                Enemy.Spawn(field, new Vector3(MidX + Random.Range(-1.8f, 1.8f), 0f, SpawnZ), Config.EnemyHpAt(t), Config.enemyRunSpeed, squad);
         }
 
-        WaveFormation PickFormation()
+        /// <summary>Queues a wave's enemies and sizes their HP to the squad's DPS.</summary>
+        void StartWave(Segment s)
         {
-            int i = waveIndex++;
-            WaveFormation[] pressure = { WaveFormation.Line, WaveFormation.Swarm, WaveFormation.Wedge, WaveFormation.HeavySquad, WaveFormation.Block, WaveFormation.Ambush };
-            WaveFormation[] climax = { WaveFormation.EliteSpearhead, WaveFormation.Swarm, WaveFormation.HeavySquad, WaveFormation.Ambush };
-            return Phase == LevelPhase.Climax ? climax[i % climax.Length] : pressure[i % pressure.Length];
+            float half = CorridorWidth * 0.5f - 0.3f;
+            var orders = new List<Order>();
+            void Put(EnemyKind k, float x) => orders.Add(new Order { kind = k, x = Mathf.Clamp(x, -half, half) });
+            float RandX() => Random.Range(-half, half);
+            int n = s.count;
+
+            switch (s.mix)
+            {
+                case WaveMix.Rush: // plain grunts pouring in
+                    for (int i = 0; i < n; i++) Put(EnemyKind.Grunt, RandX());
+                    break;
+                case WaveMix.Line: // even ranks, a barrel in the middle of the pack
+                    for (int i = 0; i < n; i++) Put(EnemyKind.Grunt, -half + (i % 5 + 0.5f) * (2f * half / 5f));
+                    break;
+                case WaveMix.Combo: // armor in front, grunts behind, riflemen at the back
+                    for (int i = 0; i < 2 + Config.level / 3; i++) Put(EnemyKind.Heavy, -1.4f + i * 1.4f);
+                    for (int i = 0; i < n - 6; i++) Put(EnemyKind.Grunt, RandX());
+                    for (int i = 0; i < 2 + Config.level / 3; i++) Put(EnemyKind.Rifleman, RandX());
+                    break;
+                case WaveMix.SwarmHeavy: // runners flood the gaps around a few heavies
+                    for (int i = 0; i < n; i++) Put(i % 7 == 0 ? EnemyKind.Heavy : EnemyKind.Runner, RandX());
+                    break;
+                case WaveMix.Final: // everything at once
+                    for (int i = 0; i < n; i++)
+                        Put(i % 8 == 0 ? EnemyKind.Heavy : i % 5 == 0 ? EnemyKind.Runner : i % 11 == 0 ? EnemyKind.Rifleman : EnemyKind.Grunt, RandX());
+                    break;
+            }
+
+            // HP: the wave as a whole should soak "pressure × DPS × duration".
+            float weight = 0f;
+            foreach (var o in orders) weight += o.kind == EnemyKind.Heavy ? 6f : o.kind == EnemyKind.Runner ? 0.6f : o.kind == EnemyKind.Rifleman ? 2f : 1f;
+            float duration = s.end - s.start;
+            waveHp = Mathf.Max(Config.EnemyHpAt(t), s.pressure * SquadDps * duration / Mathf.Max(1f, weight));
+
+            foreach (var o in orders) queue.Enqueue(o);
+            int rows = Mathf.Max(1, Mathf.CeilToInt(orders.Count / 4f));
+            rowGap = Mathf.Clamp(duration * 0.8f / rows, 0.12f, 0.25f);
+            nextRow = t;
+            if (s.mix == WaveMix.Line || s.mix == WaveMix.Final)
+                ExplosiveBarrel.Spawn(field, new Vector3(MidX + Random.Range(-1f, 1f), 0f, SpawnZ - 1f), 3f, Config.enemyRunSpeed, squad);
+            Debug.Log($"[WAVE] {s.mix} n={orders.Count} hp/grunt={waveHp:0.0} rowGap={rowGap:0.00}");
+        }
+
+        /// <summary>Releases queued wave enemies in rows of 3–5, respecting the active cap.</summary>
+        void DrainQueue()
+        {
+            if (queue.Count == 0 || t < nextRow) return;
+            int room = Config.activeCap - Enemy.LivingCount;
+            if (room <= 0) return; // wait for the field to thin out
+            int row = Mathf.Min(Random.Range(3, 6), queue.Count, room);
+            for (int i = 0; i < row; i++)
+            {
+                var o = queue.Dequeue();
+                Enemy.Spawn(field, new Vector3(MidX + o.x, 0f, SpawnZ + Random.Range(0f, 0.4f)), waveHp, Config.enemyRunSpeed, squad, o.kind);
+            }
+            nextRow = t + rowGap;
         }
 
         // ---------------- Side corridors ----------------
@@ -227,10 +287,9 @@ namespace RecruitRush
 
             if (gateIndex < Config.gateTimes.Length && Time01 >= Config.gateTimes[gateIndex])
             {
-                // Shootable gates alternate corridors; they start negative, so they must be focused to pay off.
                 bool right = gateIndex % 2 == 0;
                 float start = -(5 + Config.level * 2 + gateIndex * 3);
-                float step = Mathf.Max(1f, Config.crateBaseHp * 0.25f); // damage per +1
+                float step = Mathf.Max(1f, Config.crateBaseHp * 0.25f);
                 ShootableGate.Spawn(field, new Vector3(right ? RightX : LeftX, 0f, SpawnZ), CorridorWidth, start, step, 60f, squad);
                 gateIndex++;
                 nextCrate = Mathf.Max(nextCrate, t + 2f);
@@ -243,7 +302,6 @@ namespace RecruitRush
             }
         }
 
-        /// <summary>Soldier crates that grow modestly over the level; every 3rd is an upgrade.</summary>
         void SpawnCrate(float z)
         {
             int i = crateIndex++;
@@ -258,100 +316,6 @@ namespace RecruitRush
             int[] rewards = { 5, 10, 10, 15, 20, 25, 30 };
             int amount = rewards[Mathf.Min(i / 2, rewards.Length - 1)];
             UpgradeCrate.Spawn(field, new Vector3(RightX, 0f, z), UpgradeType.Soldiers, Mathf.Round(Config.crateBaseHp * (1f + amount / 5f)), squad, amount);
-        }
-
-        // ---------------- Middle corridor ----------------
-
-        /// <summary>
-        /// Turns an HP budget into a head count that respects the active-enemy cap.
-        /// If the cap would be exceeded, fewer enemies spawn but each gets proportionally more HP (up to ×4).
-        /// </summary>
-        int Plan(float budget, float hpEach, int min, int max, out float hpOut)
-        {
-            int wanted = Mathf.Clamp(Mathf.RoundToInt(budget / Mathf.Max(0.1f, hpEach)), min, max);
-            int room = Mathf.Max(0, Config.activeCap - Enemy.LivingCount);
-            int n = Mathf.Min(wanted, room);
-            hpOut = hpEach * (n > 0 ? Mathf.Clamp(wanted / (float)n, 1f, 4f) : 1f);
-            return n;
-        }
-
-        void BackgroundColumn()
-        {
-            if (t < nextRow) return;
-            nextRow = t + Config.rowInterval;
-            float hp = Config.EnemyHpAt(t);
-            rowHpAcc += Config.Pressure(Phase) * SquadDps * Config.rowInterval;
-            int n = Plan(rowHpAcc, hp, 0, 14, out float hpEach);
-            if (n <= 0) return;
-            rowHpAcc = Mathf.Max(0f, rowHpAcc - n * hpEach);
-            SpawnRow(n, SpawnZ, hpEach, Phase >= LevelPhase.Pressure ? 0.04f : 0f);
-        }
-
-        void SpawnRow(int n, float z, float hp, float heavyChance, EnemyKind kind = EnemyKind.Grunt)
-        {
-            n = Mathf.Max(1, n);
-            float cell = CorridorWidth / n;
-            int heavyAt = Random.value < heavyChance ? Random.Range(0, n) : -1;
-            for (int i = 0; i < n; i++)
-            {
-                float x = MidX - CorridorWidth * 0.5f + (i + 0.5f) * cell + Random.Range(-0.1f, 0.1f);
-                Enemy.Spawn(field, new Vector3(x, 0f, z + Random.Range(0f, 0.3f)), hp, Config.enemyRunSpeed, squad,
-                    i == heavyAt ? EnemyKind.Heavy : kind);
-            }
-        }
-
-        void Spawn(float x, float z, float hp, EnemyKind kind) =>
-            Enemy.Spawn(field, new Vector3(MidX + x, 0f, z), hp, Config.enemyRunSpeed, squad, kind);
-
-        void SpawnWave(WaveFormation f)
-        {
-            float z = SpawnZ + 2f, half = CorridorWidth * 0.5f - 0.3f;
-            float budget = Config.Pressure(Phase) * SquadDps * 1.5f;
-            float hp = Config.EnemyHpAt(t);
-            int n;
-            float each;
-            Debug.Log($"[WAVE] {f} t={t:0.0} budget={budget:0} squad={squad.Count} living={Enemy.LivingCount}");
-            switch (f)
-            {
-                case WaveFormation.Line: // dense ranks across the whole corridor
-                    n = Plan(budget, hp, 8, 30, out each);
-                    for (int r = 0; r * 12 < n; r++) SpawnRow(Mathf.Min(12, n - r * 12), z + r * 0.8f, each, 0f);
-                    break;
-                case WaveFormation.Wedge: // V with a heavy at the tip
-                    n = Plan(budget, hp, 8, 28, out each);
-                    Spawn(0f, z, each, EnemyKind.Heavy);
-                    for (int i = 0; i < n; i++)
-                    {
-                        int r = 1 + i / 2;
-                        float side = i % 2 == 0 ? -1f : 1f;
-                        Spawn(Mathf.Clamp(side * r * 0.32f, -half, half), z + r * 0.45f, each, EnemyKind.Grunt);
-                    }
-                    break;
-                case WaveFormation.Block: // fat rectangle with a barrel in front: one good shot thins it out
-                    n = Plan(budget, hp, 10, 32, out each);
-                    for (int r = 0; r * 8 < n; r++) SpawnRow(Mathf.Min(8, n - r * 8), z + r * 0.7f, each, 0f);
-                    ExplosiveBarrel.Spawn(field, new Vector3(MidX + Random.Range(-1f, 1f), 0f, z - 1f), 3f, Config.enemyRunSpeed, squad);
-                    break;
-                case WaveFormation.Swarm: // lots of fast, fragile runners: answered by fire rate and numbers
-                    n = Plan(budget, hp * 0.6f, 15, 30, out each);
-                    for (int i = 0; i < n; i++) Spawn(Random.Range(-half, half), z + i * 0.25f, each / 0.6f, EnemyKind.Runner);
-                    break;
-                case WaveFormation.HeavySquad: // few armored brutes: answered by damage per bullet
-                    n = Plan(budget, hp * 6f, 2, 6, out each);
-                    for (int i = 0; i < n; i++) Spawn(-half + (i + 0.5f) * (2f * half / n), z + (i % 2) * 0.8f, each / 6f, EnemyKind.Heavy);
-                    break;
-                case WaveFormation.Ambush: // riflemen that halt at range, screened by grunts
-                    int riflemen = 2 + Config.level / 2;
-                    for (int i = 0; i < riflemen; i++) Spawn(Random.Range(-half, half), z + 2f + i * 0.6f, hp, EnemyKind.Rifleman);
-                    n = Plan(budget * 0.6f, hp, 4, 16, out each);
-                    SpawnRow(Mathf.Max(1, n), z, each, 0f);
-                    break;
-                case WaveFormation.EliteSpearhead: // heavies soak bullets up front, runners slip through behind them
-                    for (int i = 0; i < 3; i++) Spawn(-1.4f + i * 1.4f, z, hp, EnemyKind.Heavy);
-                    n = Plan(budget * 0.7f, hp * 0.6f, 8, 20, out each);
-                    for (int i = 0; i < n; i++) Spawn(Random.Range(-half, half), z + 1.5f + i * 0.4f, each / 0.6f, EnemyKind.Runner);
-                    break;
-            }
         }
     }
 }
