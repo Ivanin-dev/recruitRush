@@ -63,7 +63,7 @@ namespace RecruitRush
         }
     }
 
-    public enum EnemyKind { Grunt, Runner, Heavy }
+    public enum EnemyKind { Grunt, Runner, Heavy, Rifleman }
 
     /// <summary>Middle lane: an enemy soldier running straight down. Costs soldiers if it rams or breaks through.</summary>
     public class Enemy : Target
@@ -88,6 +88,10 @@ namespace RecruitRush
         float armor;
         int breachCost = 1;
         TextMesh hpLabel;
+        // Rifleman: halts at range and shoots instead of charging.
+        float holdDistance, fireTimer;
+        static readonly Color RiflemanMark = new(1f, 0.85f, 0.2f);
+        static readonly Color EnemyTracer = new(1f, 0.3f, 0.2f);
 
         public static Enemy Spawn(Transform parent, Vector3 pos, float hp, float runSpeed, PlayerSquad squad,
             EnemyKind kind = EnemyKind.Grunt)
@@ -125,6 +129,11 @@ namespace RecruitRush
                     e.halfWidth = 0.55f;
                     e.hitHeight = 0.7f;
                     break;
+                case EnemyKind.Rifleman:
+                    hp *= 2f;
+                    e.holdDistance = Random.Range(16f, 22f);
+                    e.fireTimer = Random.Range(0f, 1f);
+                    break;
             }
             e.hp = hp;
             e.runSpeed = runSpeed;
@@ -157,6 +166,8 @@ namespace RecruitRush
                 e.hpLabel = Art.Text("Hp", go.transform, new Vector3(0f, 1.25f, 0f), Mathf.CeilToInt(hp).ToString(), 0.3f, Color.white);
                 e.hpLabel.gameObject.AddComponent<Billboard>();
             }
+            if (kind == EnemyKind.Rifleman) // yellow marker: "shoots back, deal with it"
+                Art.Box("Mark", go.transform, new Vector3(0f, 1.25f, 0f), Vector3.one * 0.18f, Art.Glow(RiflemanMark), Prims.Sphere, false);
             return e;
         }
 
@@ -178,6 +189,22 @@ namespace RecruitRush
             float dt = Time.deltaTime;
             Vector3 p = transform.position;
             Vector3 sp = squad.transform.position;
+
+            if (Kind == EnemyKind.Rifleman && p.z - sp.z <= holdDistance)
+            {
+                // Dug in: shoot a soldier every so often until killed.
+                fireTimer += dt;
+                if (fireTimer >= 1.6f && squad.Count > 1)
+                {
+                    fireTimer = 0f;
+                    Vector3 muzzle = p + Vector3.up * 0.5f + Vector3.back * 0.3f;
+                    Vector2 off = Random.insideUnitCircle * squad.Radius * 0.6f;
+                    if (gm.Tracers) gm.Tracers.Fire(muzzle, sp + new Vector3(off.x, 0.5f, off.y), EnemyTracer);
+                    Fx.Muzzle(muzzle, EnemyTracer);
+                    squad.SetCount(squad.Count - 1, muzzle);
+                }
+                return;
+            }
 
             // Straight down the middle lane: no chasing.
             p.z -= (gm.WorldSpeed + runSpeed) * dt;

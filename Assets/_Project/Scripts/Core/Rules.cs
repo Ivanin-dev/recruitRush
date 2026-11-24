@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace RecruitRush
 {
@@ -61,7 +61,7 @@ namespace RecruitRush
     public static class Formation
     {
         const float Golden = 2.39996323f;
-        public const float MaxRadius = 2.1f;
+        public const float MaxRadius = 4.0f;
 
         public static float Spacing(int n, float baseSpacing) =>
             Mathf.Min(baseSpacing, (MaxRadius - 0.25f) / Mathf.Sqrt(Mathf.Max(1, n - 1)));

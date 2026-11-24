@@ -28,6 +28,8 @@ namespace RecruitRush
         public CameraFollow Cam { get; private set; }
         public GameUI UI { get; private set; }
         public int Kills { get; private set; }
+        /// <summary>Shared tracer pool (squad bullets and enemy fire).</summary>
+        public Tracers Tracers { get; private set; }
         public float WorldSpeed => Current == State.Playing ? conveyorSpeed : 0f;
 
         int coins, lastCount;
@@ -57,12 +59,12 @@ namespace RecruitRush
             WorldBuilder.Build(world, new System.Random(Level * 7919 + 1));
 
             var field = new GameObject("Field").transform;
-            var tracers = Tracers.Create(field);
+            Tracers = Tracers.Create(field);
             var squadGo = new GameObject("PlayerSquad");
             squadGo.transform.SetParent(field, false);
             Squad = squadGo.AddComponent<PlayerSquad>();
             Squad.roadHalfWidth = WorldBuilder.HalfWidth;
-            Squad.Init(Config.startCount, tracers);
+            Squad.Init(Config.startCount, Tracers);
             Squad.CountChanged += OnSquadCount;
             Director = LevelDirector.Create(field, Config, Squad);
 
@@ -79,7 +81,7 @@ namespace RecruitRush
             UI.ShowHint("HOLD & DRAG TO MOVE");
             Squad.StatsChanged += () => UI.SetStats(Squad);
 
-            Debug.Log($"[LEVEL] {Level}: duration={Config.duration}s finalWave={Config.finalWave} bossHp={Config.bossHp}");
+            Debug.Log($"[LEVEL] {Level}: duration={Config.duration}s waves every {Config.waveInterval:0.0}s turrets={Config.turretTimes.Length} bossHp={Config.bossHp}");
             if (Debug.isDebugBuild && CommandLine.Has("-autoplay")) gameObject.AddComponent<AutoPilot>();
         }
 
@@ -121,6 +123,17 @@ namespace RecruitRush
             Sfx.Upgrade();
             Haptics.Medium();
             Cam.Shake(0.12f);
+        }
+
+        public void ApplyGate(int value, Vector3 at)
+        {
+            if (Current != State.Playing || value == 0) return;
+            Squad.SetCount(Squad.Count + value, at);
+            Color c = value > 0 ? new Color(0.55f, 0.85f, 1f) : new Color(1f, 0.4f, 0.35f);
+            FloatingText.Spawn(Squad.transform, new Vector3(0f, 2.8f, 0f), (value > 0 ? "+" : "") + value, c);
+            if (value > 0) Sfx.Upgrade(); else Sfx.Boom(0.8f);
+            Haptics.Medium();
+            Debug.Log($"[GATE] {value:+0;-0} -> squad={Squad.Count}");
         }
 
         /// <summary>Conveyor speed for a lane: a side corridor is frozen while its barricade stands.</summary>

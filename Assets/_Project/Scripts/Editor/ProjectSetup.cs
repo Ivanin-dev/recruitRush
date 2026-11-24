@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using UnityEditor;
@@ -46,7 +46,7 @@ namespace RecruitRush.EditorTools
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = Sky;
             cam.fieldOfView = 55f;
-            cam.nearClipPlane = 0.3f;
+            cam.nearClipPlane = 1f; // better depth precision for the flat, layered ground
             cam.farClipPlane = 160f;
             camGo.AddComponent<AudioListener>();
             var camData = camGo.AddComponent<UniversalAdditionalCameraData>();

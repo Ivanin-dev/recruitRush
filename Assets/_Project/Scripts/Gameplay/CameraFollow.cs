@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace RecruitRush
 {
@@ -6,8 +6,8 @@ namespace RecruitRush
     public class CameraFollow : MonoBehaviour
     {
         public PlayerSquad squad;
-        public Vector3 offset = new(0f, 14f, -8f);
-        public float lookAhead = 11f;
+        public Vector3 offset = new(0f, 25f, -13.5f);
+        public float lookAhead = 17f;
 
         Vector3 basePos, vel;
         float shake;
@@ -26,7 +26,7 @@ namespace RecruitRush
         void Desired(out Vector3 pos, out Vector3 look)
         {
             Vector3 sp = squad.transform.position;
-            float zoom = 1f + squad.Radius * 0.04f;
+            float zoom = 1f + squad.Radius * 0.02f;
             look = new Vector3(sp.x * 0.2f, 0f, sp.z + lookAhead);
             pos = new Vector3(sp.x * 0.2f, 0f, sp.z) + offset * zoom;
         }

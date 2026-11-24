@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 namespace RecruitRush
@@ -14,9 +14,9 @@ namespace RecruitRush
         }
 
         public float baseSpacing = 0.42f;
-        public int maxVisible = 150;
+        public int maxVisible = 200;
         public float roadHalfWidth = 4.5f;
-        public float range = 26f;
+        public float range = 34f;
 
         public static readonly Color UniformColor = new(0.36f, 0.45f, 0.25f);
         public static readonly Color HelmetColor = new(0.26f, 0.33f, 0.18f);
