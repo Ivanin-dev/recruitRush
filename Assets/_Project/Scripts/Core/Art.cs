@@ -1,0 +1,131 @@
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.Rendering;
+
+namespace RecruitRush
+{
+    /// <summary>Cached built-in primitive meshes (no colliders, no per-object primitives).</summary>
+    public static class Prims
+    {
+        static Mesh cube, sphere, capsule, cylinder;
+        public static Mesh Cube => cube ? cube : (cube = Grab(PrimitiveType.Cube));
+        public static Mesh Sphere => sphere ? sphere : (sphere = Grab(PrimitiveType.Sphere));
+        public static Mesh Capsule => capsule ? capsule : (capsule = Grab(PrimitiveType.Capsule));
+        public static Mesh Cylinder => cylinder ? cylinder : (cylinder = Grab(PrimitiveType.Cylinder));
+
+        static Mesh Grab(PrimitiveType type)
+        {
+            var go = GameObject.CreatePrimitive(type);
+            go.SetActive(false);
+            var mesh = go.GetComponent<MeshFilter>().sharedMesh;
+            if (Application.isPlaying) Object.Destroy(go); else Object.DestroyImmediate(go);
+            return mesh;
+        }
+    }
+
+    /// <summary>Placeholder-art helpers: colored materials, boxes and world-space text.</summary>
+    public static class Art
+    {
+        static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
+        static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
+        static readonly Dictionary<long, Material> Cache = new();
+        static GameAssets assets;
+        static Font font;
+
+        public static void Init(GameAssets a)
+        {
+            assets = a;
+            Cache.Clear();
+        }
+
+        public static Font Font => font ? font : (font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf"));
+
+        public static Material Lit(Color c) => Get(c, 0);
+        public static Material Glow(Color c) => Get(c, 1);
+
+        static Material Get(Color c, int kind)
+        {
+            Color32 k = c;
+            long key = ((long)kind << 32) | ((long)k.r << 24) | ((long)k.g << 16) | ((long)k.b << 8) | k.a;
+            if (Cache.TryGetValue(key, out var m) && m) return m;
+
+            Material template = assets ? (kind == 1 ? assets.glow : assets.lit) : null;
+            m = template ? new Material(template) : new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            m.enableInstancing = true;
+            m.SetColor(BaseColorId, c);
+            if (kind == 1) m.SetColor(EmissionId, c * 3f);
+            Cache[key] = m;
+            return m;
+        }
+
+        public static GameObject Box(string name, Transform parent, Vector3 localPos, Vector3 scale, Material mat,
+            Mesh mesh = null, bool castShadows = true)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = localPos;
+            go.transform.localScale = scale;
+            go.AddComponent<MeshFilter>().sharedMesh = mesh ? mesh : Prims.Cube;
+            var r = go.AddComponent<MeshRenderer>();
+            r.sharedMaterial = mat;
+            r.shadowCastingMode = castShadows ? ShadowCastingMode.On : ShadowCastingMode.Off;
+            return go;
+        }
+
+        /// <summary>World-space text. <paramref name="height"/> is the approximate line height in meters.</summary>
+        public static TextMesh Text(string name, Transform parent, Vector3 localPos, string text, float height, Color color,
+            int fontSize = 96)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = localPos;
+            var tm = go.AddComponent<TextMesh>();
+            tm.font = Font;
+            tm.fontSize = fontSize;
+            tm.fontStyle = FontStyle.Bold;
+            tm.characterSize = height * 10f / fontSize;
+            tm.anchor = TextAnchor.MiddleCenter;
+            tm.alignment = TextAlignment.Center;
+            tm.color = color;
+            tm.text = text;
+            var r = go.GetComponent<MeshRenderer>();
+            r.sharedMaterial = Font.material;
+            r.shadowCastingMode = ShadowCastingMode.Off;
+            r.receiveShadows = false;
+            return tm;
+        }
+    }
+
+    public static class UnitFactory
+    {
+        static readonly Color GunMetal = new(0.12f, 0.12f, 0.12f);
+
+        public static Transform Soldier(Transform parent, Color uniform, Color helmet, out Transform gun)
+        {
+            var root = new GameObject("Soldier").transform;
+            root.SetParent(parent, false);
+            Art.Box("Body", root, new Vector3(0f, 0.36f, 0f), new Vector3(0.34f, 0.34f, 0.3f), Art.Lit(uniform), Prims.Capsule);
+            Art.Box("Helmet", root, new Vector3(0f, 0.78f, 0f), Vector3.one * 0.25f, Art.Lit(helmet), Prims.Sphere, false);
+            gun = Art.Box("Gun", root, Weapons.GunPos[1], Weapons.GunScale[1], Art.Lit(GunMetal), null, false).transform;
+            return root;
+        }
+    }
+
+    public static class CommandLine
+    {
+        public static bool Has(string name)
+        {
+            foreach (var a in System.Environment.GetCommandLineArgs())
+                if (a == name) return true;
+            return false;
+        }
+
+        public static string Value(string name)
+        {
+            var args = System.Environment.GetCommandLineArgs();
+            for (int i = 0; i < args.Length - 1; i++)
+                if (args[i] == name) return args[i + 1];
+            return null;
+        }
+    }
+}
