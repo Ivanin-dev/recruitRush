@@ -17,6 +17,7 @@ namespace RecruitRush
         public GameObject playerSoldier;
         public GameObject enemySoldier;
         public GameObject heavySoldier;
-        public RuntimeAnimatorController soldierAnimator;
+        public RuntimeAnimatorController soldierAnimator;   // enemies: run loop
+        public RuntimeAnimatorController shooterAnimator;   // player squad: stands and fires
     }
 }

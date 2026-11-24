@@ -108,7 +108,8 @@ namespace RecruitRush
         /// Instantiates an imported character prefab under a fresh root, normalized to <paramref name="height"/>
         /// meters and playing the shared run loop with a random phase so the crowd doesn't march in lockstep.
         /// </summary>
-        public static Transform Model(Transform parent, GameObject prefab, float height = SoldierHeight)
+        public static Transform Model(Transform parent, GameObject prefab, float height = SoldierHeight,
+            RuntimeAnimatorController controllerOverride = null)
         {
             var root = new GameObject("Soldier").transform;
             root.SetParent(parent, false);
@@ -132,7 +133,7 @@ namespace RecruitRush
             }
             var animator = model.GetComponentInChildren<Animator>();
             if (!animator) animator = model.AddComponent<Animator>();
-            var controller = Art.Assets ? Art.Assets.soldierAnimator : null;
+            var controller = controllerOverride ? controllerOverride : Art.Assets ? Art.Assets.soldierAnimator : null;
             if (controller)
             {
                 animator.runtimeAnimatorController = controller;

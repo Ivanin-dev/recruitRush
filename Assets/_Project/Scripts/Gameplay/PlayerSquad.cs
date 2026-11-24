@@ -118,7 +118,9 @@ namespace RecruitRush
             Transform root, gun = null;
             if (UnitFactory.HasModels)
             {
-                root = UnitFactory.Model(unitsRoot, Art.Assets.playerSoldier, commander ? 1.3f : UnitFactory.SoldierHeight);
+                // The squad holds its ground and fires; only the world's contents come at it.
+                root = UnitFactory.Model(unitsRoot, Art.Assets.playerSoldier, commander ? 1.3f : UnitFactory.SoldierHeight,
+                    Art.Assets.shooterAnimator);
                 if (commander) // gold chevron marks the commander inside a big crowd
                     Art.Box("Marker", root, new Vector3(0f, 1.55f, 0f), new Vector3(0.22f, 0.22f, 0.22f), Art.Glow(CommanderHelmet), Prims.Sphere, false);
             }

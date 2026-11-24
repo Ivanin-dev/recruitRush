@@ -8,7 +8,7 @@ namespace RecruitRush
     /// <summary>
     /// Per-level tuning. Everything scales from the level number:
     ///   enemy HP     = base × (1 + 0.15·(level-1)) × (1 + 2·t01)   (toughens within the level)
-    ///   boss HP      = 6000 × (1 + 0.4·(level-1))
+    ///   boss HP      = 2500 × (1 + 0.35·(level-1))
     ///   barricades   = base × (1 + 0.3·(level-1))
     /// </summary>
     public class LevelConfig
@@ -30,7 +30,7 @@ namespace RecruitRush
         public float finalWaveSeconds = 4f;
         public float bossHp;
         public int bossKills;
-        public float bossInterval = 1.2f;
+        public float bossInterval = 1.5f;
 
         public float T01(float t) => Mathf.Clamp01(t / duration);
         public float EnemyHpAt(float t) => enemyHp * (1f + 2f * T01(t));
@@ -76,8 +76,8 @@ namespace RecruitRush
                 gateTimes = new[] { 0.2f, 0.45f, 0.7f },
                 turretTimes = level >= 2 ? new[] { 0.4f, 0.8f } : new[] { 0.6f },
                 turretHp = 120f * (1f + k * 0.35f),
-                bossHp = Mathf.Round(6000f * (1f + k * 0.4f) / 10f) * 10f,
-                bossKills = 4 + level,
+                bossHp = Mathf.Round(2500f * (1f + k * 0.35f) / 10f) * 10f,
+                bossKills = 2 + level / 2,
             };
         }
     }

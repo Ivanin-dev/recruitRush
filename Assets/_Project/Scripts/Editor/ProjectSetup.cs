@@ -171,7 +171,36 @@ namespace RecruitRush.EditorTools
                 controller.layers[0].stateMachine.defaultState = state;
             }
             assets.soldierAnimator = controller;
+            assets.shooterAnimator = MakeLoopController(Root + "/Data/AC_Shooter.controller", ToonyRoot + "/animation/m_weapon_shoot.FBX", "Shoot");
             Debug.Log("[SETUP] Toony Tiny models assigned.");
+        }
+
+        /// <summary>One-state controller playing the given clip, forced to loop.</summary>
+        static RuntimeAnimatorController MakeLoopController(string controllerPath, string fbxPath, string stateName)
+        {
+            if (AssetImporter.GetAtPath(fbxPath) is ModelImporter importer)
+            {
+                var clips = importer.clipAnimations.Length > 0 ? importer.clipAnimations : importer.defaultClipAnimations;
+                bool changed = false;
+                foreach (var c in clips)
+                    if (!c.loopTime) { c.loopTime = true; changed = true; }
+                if (changed)
+                {
+                    importer.clipAnimations = clips;
+                    importer.SaveAndReimport();
+                }
+            }
+            var clip = AssetDatabase.LoadAllAssetsAtPath(fbxPath).OfType<AnimationClip>().FirstOrDefault(c => !c.name.StartsWith("__preview"));
+            if (!clip) return null;
+            var controller = AssetDatabase.LoadAssetAtPath<UnityEditor.Animations.AnimatorController>(controllerPath);
+            if (!controller)
+            {
+                controller = UnityEditor.Animations.AnimatorController.CreateAnimatorControllerAtPath(controllerPath);
+                var state = controller.layers[0].stateMachine.AddState(stateName);
+                state.motion = clip;
+                controller.layers[0].stateMachine.defaultState = state;
+            }
+            return controller;
         }
 
         /// <summary>Alpha-blended URP Particles/Unlit; intensity above 1 makes it bloom.</summary>

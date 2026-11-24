@@ -50,6 +50,8 @@ namespace RecruitRush
             var scroller = root.gameObject.AddComponent<Scroller>();
             scroller.minZ = MinZ;
             scroller.period = Period;
+            // The map stays put: only corridor contents travel toward the squad, which holds its ground.
+            scroller.enabled = false;
 
             float len = Period + 10f, mid = MinZ + len * 0.5f;
             Art.Box("Ground", root, new Vector3(0f, -0.12f, mid), new Vector3(120f, 0.2f, len + 60f), Art.Lit(Sand));
