@@ -12,7 +12,7 @@ namespace RecruitRush
         GameManager gm;
         string dir;
         float t, endT = -1f, bossT = -1f;
-        bool shot1, shot2, shot3, shotBoss, shotEnd;
+        bool shotStart, shot1, shot2, shot3, shotBoss, shotEnd;
 
         void Start()
         {
@@ -27,7 +27,8 @@ namespace RecruitRush
             t += Time.deltaTime;
             if (gm.Current == GameManager.State.Ready)
             {
-                if (t > 1f) gm.Begin();
+                if (!shotStart && t > 0.8f) { shotStart = true; Shot("0_start"); }
+                if (t > 1.2f) gm.Begin();
                 return;
             }
 

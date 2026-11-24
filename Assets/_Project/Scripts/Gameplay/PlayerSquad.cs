@@ -55,9 +55,8 @@ namespace RecruitRush
             badge = new GameObject("Badge").transform;
             badge.SetParent(transform, false);
             badge.gameObject.AddComponent<Billboard>();
-            Art.Box("BadgeBg", badge, new Vector3(0f, 0f, 0.03f), new Vector3(1.3f, 0.62f, 0.04f),
-                Art.Lit(new Color(0.15f, 0.38f, 0.8f)), null, false);
-            badgeText = Art.Text("BadgeText", badge, new Vector3(0f, 0f, -0.03f), "0", 0.5f, Color.white);
+            // The squad size is the number the player cares about most: big, bold, outlined, no box.
+            badgeText = Art.Text("BadgeText", badge, Vector3.zero, "0", 1.1f, Color.white);
 
             SetCount(count, transform.position);
         }

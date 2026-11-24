@@ -37,7 +37,7 @@ namespace RecruitRush
 
         void Update()
         {
-            t += Time.deltaTime;
+            t += Time.unscaledDeltaTime; // real time, so UI pops still play while the game is paused
             float k = Mathf.Clamp01(t / Duration);
             transform.localScale = baseScale * Mathf.LerpUnclamped(from, 1f, EaseOutBack(k));
             if (k >= 1f)

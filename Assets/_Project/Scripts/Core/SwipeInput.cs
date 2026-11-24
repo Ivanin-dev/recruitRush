@@ -24,6 +24,16 @@ namespace RecruitRush
             }
         }
 
+        /// <summary>True when the pointer is over a UI element (so a tap on a button doesn't also start the run).</summary>
+        public static bool OverUI
+        {
+            get
+            {
+                var es = UnityEngine.EventSystems.EventSystem.current;
+                return es && es.IsPointerOverGameObject();
+            }
+        }
+
         /// <summary>Horizontal drag this frame as a fraction of screen width.</summary>
         public static float DeltaX01
         {

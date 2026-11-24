@@ -78,7 +78,7 @@ namespace RecruitRush
             UI.SetLevel(Level);
             UI.SetCoins(coins);
             UI.SetStats(Squad);
-            UI.ShowHint("HOLD & DRAG TO MOVE");
+            UI.ShowStart(Level);
             Squad.StatsChanged += () => UI.SetStats(Squad);
 
             Debug.Log($"[LEVEL] {Level}: duration={Config.duration}s segments={Config.segments.Count} cap={Config.activeCap} turrets={Config.turretTimes.Length} bossHp={Config.bossHp}");
@@ -90,9 +90,10 @@ namespace RecruitRush
             switch (Current)
             {
                 case State.Ready:
-                    if (SwipeInput.PressedThisFrame) Begin();
+                    if (SwipeInput.PressedThisFrame && !SwipeInput.OverUI) Begin();
                     break;
                 case State.Playing:
+                    if (UI.Paused) break;
                     if (SwipeInput.Pressed)
                         Squad.Steer(SwipeInput.DeltaX01 * WorldBuilder.HalfWidth * 2f * steerSensitivity);
                     UI.SetProgress(Director.Time01, Director.FinalPhase);
@@ -105,7 +106,7 @@ namespace RecruitRush
             if (Current != State.Ready) return;
             Current = State.Playing;
             Squad.Firing = true;
-            UI.HideHint();
+            UI.HideStart();
         }
 
         public void OnEnemyKilled() => Kills++;
@@ -163,12 +164,26 @@ namespace RecruitRush
             Haptics.Heavy();
             StartCoroutine(SlowMotion());
             int reward = 20 + Level * 5 + Squad.Count + Kills / 2;
+            int before = coins;
             coins += reward;
             PlayerPrefs.SetInt(CoinsKey, coins);
             PlayerPrefs.SetInt(LevelKey, Level + 1);
             PlayerPrefs.Save();
-            StartCoroutine(ShowResult(true, $"Survivors: {Squad.Count}   Kills: {Kills}\n+{reward} coins"));
+            StartCoroutine(ShowResult(new ResultInfo
+            {
+                win = true, level = Level, survivors = Squad.Count, kills = Kills, reward = reward, coinsBefore = before
+            }));
         }
+
+        static readonly string[] Tips =
+        {
+            "Shoot the crates on the right: they add soldiers and upgrades",
+            "Break the left barricade first to start growing early",
+            "Armored enemies shrug off weak guns: grab DAMAGE upgrades",
+            "Shoot a gate until it turns blue before standing under it",
+            "Riflemen only hit their own lane: take them out or step aside",
+            "Red barrels blow up the whole pack around them",
+        };
 
         IEnumerator SlowMotion()
         {
@@ -188,14 +203,17 @@ namespace RecruitRush
             if (count > 0 || Current != State.Playing) return;
             Current = State.Lose;
             Squad.Firing = false;
-            StartCoroutine(ShowResult(false, $"Your squad was wiped out\nKills: {Kills}"));
+            StartCoroutine(ShowResult(new ResultInfo
+            {
+                win = false, level = Level, survivors = 0, kills = Kills, reward = 0, coinsBefore = coins,
+                tip = Tips[Random.Range(0, Tips.Length)]
+            }));
         }
 
-        IEnumerator ShowResult(bool win, string details)
+        IEnumerator ShowResult(ResultInfo info)
         {
             yield return new WaitForSeconds(1.3f);
-            UI.SetCoins(coins);
-            UI.ShowResult(win, details, Reload);
+            UI.ShowResult(info, Reload);
         }
 
         public void Reload() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
