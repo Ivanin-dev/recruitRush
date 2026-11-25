@@ -99,7 +99,7 @@ namespace RecruitRush
         void LateUpdate()
         {
             if (!squad) return;
-            transform.localPosition = new Vector3(0f, 1.6f + squad.Radius * 0.15f, 0f);
+            transform.localPosition = new Vector3(0f, 1.6f + squad.Radius * 0.15f + squad.JumpHeight, 0f); // rides the jump
             float s = Mathf.Lerp(transform.localScale.x / CanvasScale, scale, 1f - Mathf.Exp(-8f * Time.deltaTime));
             transform.localScale = Vector3.one * (s * CanvasScale);
         }

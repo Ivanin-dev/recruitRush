@@ -43,7 +43,7 @@ namespace RecruitRush
             transform.position = p;
 
             Vector3 sp = squad.transform.position;
-            if (squad.Count > 0 && Mathf.Abs(p.z - sp.z) < squad.Radius * 0.8f + 0.3f &&
+            if (squad.Count > 0 && Mathf.Abs(p.z - sp.z) < squad.Radius * 0.5f + 0.3f &&
                 Mathf.Abs(p.x - sp.x) < squad.Radius + 0.6f)
             {
                 taken = true;
@@ -55,12 +55,19 @@ namespace RecruitRush
             else if (p.z < sp.z - 6f) Destroy(gameObject);
         }
 
+        /// <summary>Flies into the middle of the squad while shrinking, so the +1 line visibly feeds the crowd.</summary>
         IEnumerator Collect()
         {
-            Vector3 s = transform.localScale;
-            for (float t = 0f; t < 0.15f; t += Time.deltaTime)
+            Vector3 s = transform.localScale, from = transform.position;
+            const float dur = 0.22f;
+            for (float t = 0f; t < dur; t += Time.deltaTime)
             {
-                transform.localScale = s * (1f - t / 0.15f);
+                float k = t / dur;
+                Vector3 to = squad ? squad.transform.position : from;
+                Vector3 p = Vector3.Lerp(from, to, k);
+                p.y += Mathf.Sin(k * Mathf.PI) * 0.8f;
+                transform.position = p;
+                transform.localScale = s * (1f - k * 0.85f);
                 yield return null;
             }
             Destroy(gameObject);

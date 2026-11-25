@@ -183,8 +183,9 @@ namespace RecruitRush
             c.boss = BossFor(level);
 
             // ---- Pressure: beat × modifier compensation × retry relief.
-            // Playtest: "too easy, impossible to lose" -> a flat 18% more pressure everywhere.
-            float pressureMul = 1.18f * (c.beat == LevelBeat.Elite ? 1.12f : c.beat == LevelBeat.Breather ? 0.88f : 1f);
+            // Pressure ramps with the level: a touch easier than before on the first levels, ~20% harder by level 15+.
+            float ramp = Mathf.Lerp(0.95f, 1.2f, Mathf.Clamp01((level - 1) / 14f));
+            float pressureMul = ramp * (c.beat == LevelBeat.Elite ? 1.12f : c.beat == LevelBeat.Breather ? 0.88f : 1f);
             pressureMul *= 1f - 0.08f * Mathf.Min(fails, 3);
             int more = Mathf.Min(14, level - 1) + (c.beat == LevelBeat.Elite ? 3 : c.beat == LevelBeat.Breather ? -2 : 0);
             switch (c.mod)
