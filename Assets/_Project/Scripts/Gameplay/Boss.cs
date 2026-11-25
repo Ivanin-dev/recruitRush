@@ -133,6 +133,59 @@ namespace RecruitRush
             StartCoroutine(Attack());
         }
 
+        /// <summary>Which attack comes next: bosses cycle through their moves instead of spamming one.</summary>
+        protected int attackStep;
+
+        static float LaneCenter(float x) =>
+            x < -2.95f ? LevelDirector.LeftX : x > 2.95f ? LevelDirector.RightX : LevelDirector.MidX;
+
+        /// <summary>
+        /// Gun run down the corridor the squad stands in: a steady red stripe whose bright fill sweeps from the boss to
+        /// the squad (the timer), then a rake of tracers. Soldiers still inside the corridor are hit: move to another one.
+        /// </summary>
+        protected IEnumerator LaneStrafe(Transform muzzle, float warn, int kills)
+        {
+            var danger = new Color(1f, 0.16f, 0.12f);
+            var tracer = new Color(1f, 0.35f, 0.2f);
+            float lane = LaneCenter(squad.transform.position.x);
+            float laneW = LevelDirector.LaneWidth(lane), half = laneW * 0.5f;
+            float z0 = squad.transform.position.z - 3f, z1 = transform.position.z - depth;
+            float len = z1 - z0;
+            var mark = new GameObject("StrafeMark").transform;
+            mark.position = new Vector3(lane, 0f, 0f);
+            Art.Box("Stripe", mark, new Vector3(0f, 0.06f, (z0 + z1) * 0.5f), new Vector3(laneW - 0.3f, 0.01f, len),
+                Art.Translucent(new Color(danger.r, danger.g, danger.b, 0.25f)), null, false);
+            foreach (int s in new[] { -1, 1 })
+                Art.Box("Edge", mark, new Vector3(s * (half - 0.15f), 0.07f, (z0 + z1) * 0.5f), new Vector3(0.18f, 0.01f, len), Art.Emissive(danger, 2f), null, false);
+            var fill = Art.Box("Fill", mark, new Vector3(0f, 0.065f, z1), new Vector3(laneW - 0.6f, 0.01f, 0.01f),
+                Art.Translucent(new Color(danger.r, danger.g * 1.6f, danger.b, 0.45f)), null, false).transform;
+            for (float t = 0f; t < warn && Alive; t += Time.deltaTime)
+            {
+                float l = len * (t / warn);
+                fill.localScale = new Vector3(laneW - 0.6f, 0.01f, Mathf.Max(0.01f, l));
+                fill.localPosition = new Vector3(0f, 0.065f, z1 - l * 0.5f);
+                yield return null;
+            }
+            Destroy(mark.gameObject);
+            if (!Alive) yield break;
+
+            Sfx.Shot(3);
+            var gm = GameManager.I;
+            const float rake = 0.45f;
+            for (float t = 0f; t < rake; t += 0.04f)
+            {
+                float z = Mathf.Lerp(z1, z0, t / rake);
+                Vector3 hit = new Vector3(lane + Random.Range(-half, half) * 0.8f, 0.1f, z);
+                if (gm && gm.Tracers) gm.Tracers.Fire(muzzle.position, hit, tracer);
+                Fx.Muzzle(muzzle.position, tracer);
+                if (Random.value < 0.5f) Fx.Sparks(hit, tracer, 2);
+                yield return new WaitForSeconds(0.04f);
+            }
+            if (!Alive) yield break;
+            int hitCount = Mathf.Min(squad.CountInBand(lane - half, lane + half), kills);
+            if (hitCount > 0) HitSquad(new Vector3(lane, 0.3f, squad.transform.position.z), hitCount, 0.35f);
+        }
+
         /// <summary>Applies an attack's casualties (if the boss is still alive when it lands).</summary>
         protected void HitSquad(Vector3 at, int kills, float shake)
         {

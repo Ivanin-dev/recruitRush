@@ -4,8 +4,9 @@ using UnityEngine;
 namespace RecruitRush
 {
     /// <summary>
-    /// Boss: a gunship hovering over the road. It fires rocket salvos onto telegraphed circles (step aside), brings ground
-    /// troops every other salvo, and can only be shot from the top of a ramp jump: ramps roll in every few seconds.
+    /// Boss: a gunship hovering over the road. It cycles rocket salvos onto telegraphed circles (step aside), gun runs
+    /// down a corridor (switch corridor) and drone drops, brings ground troops every other salvo, and can only be shot
+    /// from the top of a ramp jump: ramps roll in every few seconds.
     /// Readability: the only flying silhouette; ramps are gold/black wedges marked RAMP.
     /// </summary>
     public class BossHelicopter : Boss
@@ -89,7 +90,28 @@ namespace RecruitRush
         /// Rockets only: a salvo of 2 (enraged 3) rockets arcs onto telegraphed circles around the squad. Step out of
         /// them. The gunship can't be hit from the ground (see <see cref="Target.airHeight"/>): ride a ramp.
         /// </summary>
-        protected override IEnumerator Attack()
+        /// <summary>Cycle: rockets (step aside) → gun run down the squad's corridor (switch corridor) → rockets → drops
+        /// two drones (hop to shoot them).</summary>
+        protected override IEnumerator Attack() => (attackStep++ % 4) switch
+        {
+            1 => LaneStrafe(muzzle, Enraged ? 0.85f : 1.1f, killsPerHit),
+            3 => DropDrones(),
+            _ => Rockets()
+        };
+
+        IEnumerator DropDrones()
+        {
+            float hp = Mathf.Max(10f, squad.Dps * 0.15f);
+            for (int i = 0; i < 2; i++)
+            {
+                var d = Drone.Spawn(transform.parent, transform.position.x + (i == 0 ? -2f : 2f), hp, i == 1, squad);
+                d.transform.position = new Vector3(d.transform.position.x, 0f, transform.position.z - 2f);
+            }
+            Sfx.Boom(0.4f);
+            yield return new WaitForSeconds(0.3f);
+        }
+
+        IEnumerator Rockets()
         {
             int rockets = Enraged ? 3 : 2;
             float sx = squad.transform.position.x;

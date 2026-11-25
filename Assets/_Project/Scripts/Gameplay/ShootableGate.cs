@@ -97,7 +97,7 @@ namespace RecruitRush
             var gm = GameManager.I;
             if (squad == null || !gm) return;
             Vector3 p = transform.position;
-            p.z -= gm.LaneSpeed(p.x) * Time.deltaTime;
+            p.z -= gm.LaneSpeed(p) * Time.deltaTime;
             transform.position = p;
             if (punch > 0f)
             {
@@ -159,7 +159,7 @@ namespace RecruitRush
             var gm = GameManager.I;
             if (squad == null || !gm) return;
             Vector3 p = transform.position;
-            p.z -= gm.LaneSpeed(p.x) * Time.deltaTime;
+            p.z -= gm.LaneSpeed(p) * Time.deltaTime;
             transform.position = p;
             // A slow shimmer so the gold arch reads as "bonus" next to the plain green gate.
             arch.Tick(Time.deltaTime, (Mathf.Sin(Time.time * 4f) * 0.5f + 0.5f) * 0.35f);

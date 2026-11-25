@@ -231,6 +231,12 @@ namespace RecruitRush
         /// <summary>Conveyor speed for a lane: a side corridor is frozen while its barricade stands.</summary>
         public float LaneSpeed(float x) => Director && Director.IsLaneBlocked(x) ? 0f : WorldSpeed;
 
+        /// <summary>
+        /// Same, by position: a standing barricade only holds what is still behind it. Things already past it (march
+        /// leftovers when the barricades pop up) keep rolling instead of freezing at the squad.
+        /// </summary>
+        public float LaneSpeed(Vector3 p) => p.z > LevelDirector.ExitZ + 0.5f ? LaneSpeed(p.x) : WorldSpeed;
+
         public void OnFinalWave()
         {
             Debug.Log($"[WAVE] final wave, squad={Squad.Count}");

@@ -49,7 +49,41 @@ namespace RecruitRush
             Art.Box("Visor", model, new Vector3(0f, GiantHeight * 0.83f, 0.35f), new Vector3(0.7f, 0.15f, 0.1f), Art.Glow(Visor), null, false);
         }
 
-        protected override IEnumerator Attack()
+        /// <summary>Cycle: slam (jump the shockwave) → boulders (step aside) → slam → roar (reinforcements).</summary>
+        protected override IEnumerator Attack() => (attackStep++ % 4) switch
+        {
+            1 => Boulders(),
+            3 => Roar(),
+            _ => Slam()
+        };
+
+        /// <summary>Hurls 2 (enraged 3) boulders onto telegraphed circles around the squad.</summary>
+        IEnumerator Boulders()
+        {
+            int n = Enraged ? 3 : 2;
+            float sx = squad.transform.position.x;
+            for (int i = 0; i < n && Alive; i++)
+            {
+                float x = i == 0 ? sx + Random.Range(-0.5f, 0.5f) : sx + (i % 2 == 1 ? -1f : 1f) * Random.Range(2.6f, 4f);
+                ArtilleryStrike.SpawnShell(transform.parent, transform.position + new Vector3(i % 2 == 0 ? 1.2f : -1.2f, GiantHeight, 0f), x, squad,
+                    1.8f, 1.35f, killsPerHit, new Color(1f, 0.5f, 0.15f), Vector3.one * 0.7f, Art.Lit(new Color(0.5f, 0.46f, 0.42f)));
+                Sfx.Boom(0.5f);
+                yield return new WaitForSeconds(0.3f);
+            }
+        }
+
+        /// <summary>Beats its chest and calls in a squad of grunts.</summary>
+        IEnumerator Roar()
+        {
+            var gm = GameManager.I;
+            if (gm && gm.Cam) gm.Cam.Shake(0.3f);
+            ExplosionFX.Spawn(transform.position + Vector3.up * GiantHeight, 2f, false);
+            Sfx.Boom(1.2f);
+            if (gm && gm.Director) gm.Director.SpawnAdds(3 + gm.Level / 4);
+            yield return new WaitForSeconds(0.4f);
+        }
+
+        IEnumerator Slam()
         {
             // Wind-up: rear back, then crash down.
             Vector3 home = transform.position;

@@ -53,7 +53,24 @@ namespace RecruitRush
         /// <summary>
         /// Shells arc onto a telegraphed circle where the squad stands (enraged: a second one beside it): step aside.
         /// </summary>
-        protected override IEnumerator Attack()
+        /// <summary>Cycle: shells (step aside) → MG run down the squad's corridor (switch corridor) → shells → a low
+        /// wall fired along the road (jump it).</summary>
+        protected override IEnumerator Attack() => (attackStep++ % 4) switch
+        {
+            1 => LaneStrafe(muzzle, Enraged ? 0.85f : 1.1f, killsPerHit + 1),
+            3 => Barrier(),
+            _ => Shells()
+        };
+
+        IEnumerator Barrier()
+        {
+            ExplosionFX.Spawn(muzzle.position, 1.2f, false);
+            Sfx.Boom(0.6f);
+            JumpBarrier.Spawn(transform.parent, transform.position.z - depth - 1f, squad);
+            yield return new WaitForSeconds(0.3f);
+        }
+
+        IEnumerator Shells()
         {
             int shots = Enraged ? 2 : 1;
             for (int i = 0; i < shots; i++)

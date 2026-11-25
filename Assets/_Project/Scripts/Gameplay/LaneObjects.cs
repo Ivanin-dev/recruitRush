@@ -39,7 +39,7 @@ namespace RecruitRush
             var gm = GameManager.I;
             if (!gm || squad == null || taken) return;
             Vector3 p = transform.position;
-            p.z -= gm.LaneSpeed(p.x) * Time.deltaTime;
+            p.z -= gm.LaneSpeed(p) * Time.deltaTime;
             transform.position = p;
 
             Vector3 sp = squad.transform.position;
@@ -165,7 +165,7 @@ namespace RecruitRush
             var gm = GameManager.I;
             if (!Alive || squad == null || !gm) return;
             Vector3 p = transform.position;
-            p.z -= gm.LaneSpeed(p.x) * 0.65f * Time.deltaTime; // heavy: slower than the conveyor, more time to shoot
+            p.z -= gm.LaneSpeed(p) * 0.65f * Time.deltaTime; // heavy: slower than the conveyor, more time to shoot
             transform.position = p;
 
             if (punch > 0f)
