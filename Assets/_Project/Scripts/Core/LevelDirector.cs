@@ -46,7 +46,7 @@ namespace RecruitRush
         public int fails;
         public int startCount = 1;
         public float duration;
-        public float pickupInterval = 0.3f;
+        public float pickupInterval = 0.5f; // the +1 stream: ~2 recruits a second, not 3+
         public int bigPickupEvery = 14;
         public float enemyHp;
         public float hpMul = 1f;
@@ -72,6 +72,9 @@ namespace RecruitRush
 
         public float T01(float t) => Mathf.Clamp01(t / duration);
         public float EnemyHpAt(float t) => enemyHp * hpMul * (1f + 1.5f * T01(t));
+        /// <summary>Most a single gate (or x2) can add: grows slowly with the level, so no gate snowballs a run.</summary>
+        public int GateCap => 8 + level * 2;
+
         public bool HasKamikaze => level >= Unlocks.Bombers;
         public bool HasShields => level >= Unlocks.Shields;
         public bool HasGrenadiers => level >= Unlocks.Grenadiers;
@@ -228,7 +231,7 @@ namespace RecruitRush
             switch (c.type)
             {
                 case LevelType.Horde: // lots of cheap bodies, bombers in the middle, more recruits on the left
-                    c.pickupInterval = 0.25f;
+                    c.pickupInterval = 0.4f;
                     Add(SegmentKind.Trickle, 4f);
                     Add(SegmentKind.Wave, 3f, 16 + more, WaveMix.Swarm, 0.45f);
                     Add(SegmentKind.Window, 1.5f);
@@ -510,10 +513,10 @@ namespace RecruitRush
             switch (k)
             {
                 case GateKind.Plus:
-                    ShootableGate.Spawn(field, pos, width, 4 + lv, GateStep, 80f, squad).splitX = 0f;
+                    ShootableGate.Spawn(field, pos, width, 4 + lv, GateStep, Config.GateCap, squad).splitX = 0f;
                     break;
                 case GateKind.Minus:
-                    ShootableGate.Spawn(field, pos, width, -(4 + lv), GateStep, 80f, squad).splitX = 0f;
+                    ShootableGate.Spawn(field, pos, width, -(4 + lv), GateStep, Config.GateCap, squad).splitX = 0f;
                     break;
                 case GateKind.Times:
                     MultiplierGate.Spawn(field, pos, width, 2, squad).splitX = 0f;
@@ -536,7 +539,8 @@ namespace RecruitRush
         void MarchCrowd(int index)
         {
             float f = index == 0 ? 0.5f : 0.8f;
-            int n = Mathf.Clamp(Mathf.RoundToInt(squad.Count * f + 3 + Config.level * 0.8f), 4, 120);
+            // Sized to the squad (plus a little per level): a tiny squad meets a tiny crowd, a big one a big crowd.
+            int n = Mathf.Clamp(Mathf.RoundToInt(squad.Count * f) + Mathf.Min(Config.level / 3, 3), 2, 120);
             float hpPer = Mathf.Max(Config.EnemyHpAt(0f), SquadDps * CrowdSoak / n);
             float lim = WorldBuilder.HalfWidth - 3f;
             EnemyCrowd.Spawn(field, new Vector3(Random.Range(-lim, lim), 0f, SpawnZ + 2f), n, hpPer, squad);
@@ -820,7 +824,7 @@ namespace RecruitRush
             {
                 bool right = gateIndex % 2 == 0;
                 float start = -(5 + Config.level * 2 + gateIndex * 3);
-                ShootableGate.Spawn(field, new Vector3(right ? RightX : LeftX, 0f, SpawnZ), SideWidth, start, GateStep, 60f, squad);
+                ShootableGate.Spawn(field, new Vector3(right ? RightX : LeftX, 0f, SpawnZ), SideWidth, start, GateStep, Config.GateCap, squad);
                 gateIndex++;
                 nextCrate = Mathf.Max(nextCrate, t + 2f);
             }
@@ -853,7 +857,7 @@ namespace RecruitRush
             }
             if (rightOpen)
             {
-                ShootableGate.Spawn(field, new Vector3(RightX, 0f, SpawnZ), SideWidth, 3 + Config.level, GateStep * 0.8f, 60f, squad);
+                ShootableGate.Spawn(field, new Vector3(RightX, 0f, SpawnZ), SideWidth, 3 + Config.level, GateStep * 0.8f, Config.GateCap, squad);
                 nextCrate = Mathf.Max(nextCrate, t + 2.5f);
             }
             if (leftOpen && rightOpen && Config.level == Unlocks.ChoiceGate && GameManager.I) GameManager.I.UI.ShowBanner("PICK A GATE!", UiTheme.Current.gold);
@@ -871,7 +875,7 @@ namespace RecruitRush
                 UpgradeCrate.Spawn(field, new Vector3(RightX, 0f, z), type, Mathf.Round(Config.crateBaseHp * (3f + i * 0.5f)), squad);
                 return;
             }
-            int[] rewards = { 5, 10, 10, 15, 20, 25, 30 };
+            int[] rewards = { 3, 5, 5, 8, 10, 12, 15 }; // modest: crates help, they don't win the level alone
             int amount = rewards[Mathf.Min(i / 2, rewards.Length - 1)];
             UpgradeCrate.Spawn(field, new Vector3(RightX, 0f, z), UpgradeType.Soldiers, Mathf.Round(Config.crateBaseHp * (1f + amount / 5f)), squad, amount);
         }

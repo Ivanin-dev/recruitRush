@@ -173,6 +173,9 @@ namespace RecruitRush
         public void ApplyGate(int value, Vector3 at)
         {
             if (Current != State.Playing || value == 0) return;
+            // A minus gate hurts but never ends the run by itself: the commander walks out of it.
+            if (value < 0) value = Mathf.Max(value, 1 - Squad.Count);
+            if (value == 0) return;
             Squad.SetCount(Squad.Count + value, at);
             UI.OnGate(Squad, value);
             if (value > 0) Sfx.Upgrade(); else Sfx.Boom(0.8f);
@@ -180,11 +183,11 @@ namespace RecruitRush
             Debug.Log($"[GATE] {value:+0;-0} -> squad={Squad.Count}");
         }
 
-        /// <summary>Gold multiplier gate: multiplies the squad (gain capped at <see cref="MultiplierGate.MaxGain"/>).</summary>
+        /// <summary>Gold multiplier gate: multiplies the squad (gain capped at <see cref="LevelConfig.GateCap"/>).</summary>
         public void ApplyMultiplier(int factor, Vector3 at)
         {
             if (Current != State.Playing || factor <= 1) return;
-            int gain = Mathf.Min(Squad.Count * (factor - 1), MultiplierGate.MaxGain);
+            int gain = Mathf.Min(Squad.Count * (factor - 1), Config.GateCap);
             Squad.SetCount(Squad.Count + gain, at);
             UI.OnMultiplier(Squad, factor);
             Sfx.Upgrade();

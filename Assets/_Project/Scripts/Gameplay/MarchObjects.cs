@@ -75,8 +75,14 @@ namespace RecruitRush
                 if (clashTimer > 0f) return;
                 clashTimer = ClashTick;
                 int k = Mathf.Max(1, Mathf.Min(count, squad.Count) / 12);
-                k = Mathf.Min(k, count, squad.Count);
-                if (k <= 0) { Finish(); return; }
+                // The commander never falls in a clash: once only he is left, he finishes the rest point-blank.
+                k = Mathf.Min(k, count, squad.Count - 1);
+                if (k <= 0)
+                {
+                    while (count > 0) RemoveOne(true);
+                    Finish();
+                    return;
+                }
                 squad.SetCount(squad.Count - k, p);
                 for (int i = 0; i < k; i++) RemoveOne(false);
                 Fx.Sparks(Vector3.Lerp(p, sp, 0.5f) + Vector3.up * 0.5f, new Color(1f, 0.35f, 0.25f), 3);

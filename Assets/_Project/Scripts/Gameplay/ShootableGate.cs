@@ -14,6 +14,7 @@ namespace RecruitRush
 
         float value, growthStep, cap;
         PlayerSquad squad;
+        MeshRenderer plate;
         TMPro.TextMeshPro label;
         ArchKit.Arch arch;
         float punch, hitGlow;
@@ -42,11 +43,30 @@ namespace RecruitRush
             g.hitHeight = 1.3f;
 
             g.arch = ArchKit.Build(go.transform, width, ArchHeight, startValue >= 0 ? ArchStatus.Positive : ArchStatus.Negative);
-            g.label = Art.Text("Value", go.transform, new Vector3(0f, 1.45f, -0.25f), "", 1.05f, Color.white);
-            Art.Fit(g.label, width - 1.4f);
-            g.label.transform.localRotation = Quaternion.Euler(35f, 0f, 0f);
+            g.plate = ValuePlate(go.transform, width, g.arch.status);
+            g.label = ValueLabel(go.transform, "", width, 1.05f);
             g.Refresh();
             return g;
+        }
+
+        // Value readability: a solid plate in a deep shade of the gate's color behind a big white number, drawn over the
+        // arch's translucent fill (which used to wash the number out on the light road).
+        public static Material PlateMat(ArchStatus s) => Art.Lit(Color.Lerp(ArchKit.Role(s), Color.black, 0.35f));
+
+        public static MeshRenderer ValuePlate(Transform parent, float width, ArchStatus s)
+        {
+            var p = Art.Box("ValuePlate", parent, new Vector3(0f, 1.45f, -0.2f), new Vector3(Mathf.Min(width - 1.2f, 3.4f), 1.35f, 0.06f), PlateMat(s), null, false);
+            p.transform.localRotation = Quaternion.Euler(35f, 0f, 0f);
+            return p.GetComponent<MeshRenderer>();
+        }
+
+        public static TMPro.TextMeshPro ValueLabel(Transform parent, string text, float width, float height)
+        {
+            var tm = Art.Text("Value", parent, new Vector3(0f, 1.45f, -0.27f), text, height, Color.white);
+            Art.Fit(tm, Mathf.Min(width - 1.4f, 3.1f));
+            tm.transform.localRotation = Quaternion.Euler(35f, 0f, 0f);
+            tm.GetComponent<MeshRenderer>().sortingOrder = 10;
+            return tm;
         }
 
         void Refresh()
@@ -57,6 +77,7 @@ namespace RecruitRush
             if (status != arch.status)
             {
                 arch.SetStatus(status);
+                plate.sharedMaterial = PlateMat(status);
                 if (status == ArchStatus.Positive) punch = 2f; // turned good: bigger pop
             }
         }
@@ -124,9 +145,8 @@ namespace RecruitRush
             g.halfWidth = width * 0.5f;
             g.squad = squad;
             g.arch = ArchKit.Build(go.transform, width, 3.1f, divide ? ArchStatus.Negative : ArchStatus.Bonus);
-            var label = Art.Text("Value", go.transform, new Vector3(0f, 1.45f, -0.25f), (divide ? "/" : "x") + factor, 1.2f, Color.white);
-            Art.Fit(label, width - 1.4f);
-            label.transform.localRotation = Quaternion.Euler(35f, 0f, 0f);
+            ShootableGate.ValuePlate(go.transform, width, g.arch.status);
+            ShootableGate.ValueLabel(go.transform, (divide ? "/" : "x") + factor, width, 1.2f);
             return g;
         }
 
