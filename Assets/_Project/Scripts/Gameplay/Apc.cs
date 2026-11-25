@@ -132,8 +132,6 @@ namespace RecruitRush
             }
             Fx.Sparks(p + new Vector3(0f, 0.8f, -depth), Threat.Vehicle, 10);
             Sfx.Boom(0.6f);
-            var gm = GameManager.I;
-            if (gm) gm.UI.ShowBanner("TROOPS DEPLOYED!", UiTheme.Current.red);
         }
 
         public override void TakeHit(float damage)

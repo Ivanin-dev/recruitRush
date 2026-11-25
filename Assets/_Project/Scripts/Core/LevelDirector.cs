@@ -332,8 +332,13 @@ namespace RecruitRush
     /// </summary>
     public class LevelDirector : MonoBehaviour
     {
-        public const float LeftX = -5.9f, MidX = 0f, RightX = 5.9f, SpawnZ = 62f, ExitZ = 12f;
+        public const float LeftX = -6.8f, MidX = 0f, RightX = 6.8f, SpawnZ = 62f, ExitZ = 12f;
+        /// <summary>Middle corridor (between the walls).</summary>
         public const float CorridorWidth = 5f;
+        /// <summary>Side corridors run from the wall to the road edge, so their gates and barricades span the whole side.</summary>
+        public const float SideWidth = 7.2f;
+
+        public static float LaneWidth(float x) => Mathf.Abs(x) > 2.95f ? SideWidth : CorridorWidth;
         const float MinDps = 12f;
 
         struct Order
@@ -374,8 +379,8 @@ namespace RecruitRush
         void SetUpDefense()
         {
             var cfg = Config;
-            LeftBarricade = Barricade.Spawn(field, new Vector3(LeftX, 0f, ExitZ), cfg.leftBarricadeHp, CorridorWidth + 0.2f);
-            RightBarricade = Barricade.Spawn(field, new Vector3(RightX, 0f, ExitZ), cfg.rightBarricadeHp, CorridorWidth + 0.2f);
+            LeftBarricade = Barricade.Spawn(field, new Vector3(LeftX, 0f, ExitZ), cfg.leftBarricadeHp, SideWidth + 0.2f);
+            RightBarricade = Barricade.Spawn(field, new Vector3(RightX, 0f, ExitZ), cfg.rightBarricadeHp, SideWidth + 0.2f);
             Pop.Play(LeftBarricade.transform, 0f);
             Pop.Play(RightBarricade.transform, 0f);
             for (float z = ExitZ + 1.3f; z < SpawnZ; z += 2f)
@@ -445,7 +450,7 @@ namespace RecruitRush
         System.Collections.IEnumerator BeginDefense(GameManager gm)
         {
             Marching = false;
-            gm.UI.ShowBanner("HOLD THE LINE!", UiTheme.Current.blue);
+            if (Config.level <= 2) gm.UI.ShowBanner("HOLD THE LINE!", UiTheme.Current.blue);
             Sfx.Boom(0.8f);
             if (gm.Cam) gm.Cam.Shake(0.25f);
             SetUpDefense();
@@ -532,7 +537,7 @@ namespace RecruitRush
             float hpPer = Mathf.Max(Config.EnemyHpAt(0f), SquadDps * CrowdSoak / n);
             float lim = WorldBuilder.HalfWidth - 3f;
             EnemyCrowd.Spawn(field, new Vector3(Random.Range(-lim, lim), 0f, SpawnZ + 2f), n, hpPer, squad);
-            if (index == 0 && GameManager.I) GameManager.I.UI.ShowBanner("ENEMY SQUAD! SHOOT IT DOWN", UiTheme.Current.red);
+            if (index == 0 && Config.level == 1 && GameManager.I) GameManager.I.UI.ShowBanner("ENEMY SQUAD! SHOOT IT DOWN", UiTheme.Current.red);
         }
 
         public bool IsLaneBlocked(float x)
@@ -616,14 +621,14 @@ namespace RecruitRush
             float hp = Mathf.Max(Config.EnemyHpAt(t) * 25f, 0.4f * SquadDps * 3.5f);
             float troopHp = Mathf.Max(Config.EnemyHpAt(t), 0.5f * SquadDps / troops);
             Apc.Spawn(field, new Vector3(MidX + Random.Range(-0.8f, 0.8f), 0f, SpawnZ + 2f), Mathf.Round(hp), troops, troopHp, Config.enemyRunSpeed, squad);
-            if (first) gm.UI.ShowBanner("APC! STOP IT BEFORE THE LINE", UiTheme.Current.red);
+            if (first && Config.level == Unlocks.Apc) gm.UI.ShowBanner("APC! STOP IT BEFORE THE LINE", UiTheme.Current.red);
         }
 
         void Artillery(GameManager gm)
         {
             var times = Config.artilleryTimes;
             if (artilleryIndex >= times.Length || Time01 < times[artilleryIndex]) return;
-            if (artilleryIndex == 0 && (Config.mod == LevelMod.Barrage || Config.level == Unlocks.Artillery))
+            if (artilleryIndex == 0 && Config.level == Unlocks.Artillery)
                 gm.UI.ShowBanner("ARTILLERY! STEP ASIDE!", UiTheme.Current.red);
             float x = squad.transform.position.x + Random.Range(-0.7f, 0.7f);
             ArtilleryStrike.Spawn(field, x, squad);
@@ -650,10 +655,8 @@ namespace RecruitRush
                 {
                     var th = UiTheme.Current;
                     // A new enemy's first appearance wins over the generic wave banner: it tells how to beat it.
+                    // Only teach: a how-to banner the first time a new enemy shows up. Regular waves speak for themselves.
                     if (hint != null) gm.UI.ShowBanner(hint, th.red);
-                    else if (s.mix == WaveMix.Combo) gm.UI.ShowBanner("ELITES INCOMING!", th.red);
-                    else if (s.mix == WaveMix.Armor) gm.UI.ShowBanner("ARMOR INCOMING!", th.red);
-                    else if (s.mix == WaveMix.Snipers) gm.UI.ShowBanner("SNIPERS! TAKE THEM OUT", th.red);
                 }
                 Debug.Log($"[SEG] {s.kind} {s.mix} at t={t:0.0}s squad={squad.Count} dps={squad.Dps:0}");
             }
@@ -757,9 +760,9 @@ namespace RecruitRush
             string hint = null;
             foreach (var o in orders)
             {
-                if (o.kind == EnemyKind.Shield && !shieldHint) { shieldHint = true; hint = "SHIELDS! BIG GUNS OR BARRELS"; break; }
-                if (o.kind == EnemyKind.Grenadier && !grenadeHint) { grenadeHint = true; hint = "GRENADES! WATCH THE GROUND"; break; }
-                if (o.kind == EnemyKind.Kamikaze && !bomberHint) { bomberHint = true; hint = "BOMBERS! SHOOT THEM EARLY"; break; }
+                if (o.kind == EnemyKind.Shield && !shieldHint && Config.level == Unlocks.Shields) { shieldHint = true; hint = "SHIELDS! BIG GUNS OR BARRELS"; break; }
+                if (o.kind == EnemyKind.Grenadier && !grenadeHint && Config.level == Unlocks.Grenadiers) { grenadeHint = true; hint = "GRENADES! WATCH THE GROUND"; break; }
+                if (o.kind == EnemyKind.Kamikaze && !bomberHint && Config.level == Unlocks.Bombers) { bomberHint = true; hint = "BOMBERS! SHOOT THEM EARLY"; break; }
             }
 
             // HP: the wave as a whole should soak "pressure × DPS × duration".
@@ -814,7 +817,7 @@ namespace RecruitRush
             {
                 bool right = gateIndex % 2 == 0;
                 float start = -(5 + Config.level * 2 + gateIndex * 3);
-                ShootableGate.Spawn(field, new Vector3(right ? RightX : LeftX, 0f, SpawnZ), CorridorWidth, start, GateStep, 60f, squad);
+                ShootableGate.Spawn(field, new Vector3(right ? RightX : LeftX, 0f, SpawnZ), SideWidth, start, GateStep, 60f, squad);
                 gateIndex++;
                 nextCrate = Mathf.Max(nextCrate, t + 2f);
             }
@@ -842,15 +845,15 @@ namespace RecruitRush
             if (!leftOpen && !rightOpen) return;
             if (leftOpen)
             {
-                MultiplierGate.Spawn(field, new Vector3(LeftX, 0f, SpawnZ), CorridorWidth, 2, squad);
+                MultiplierGate.Spawn(field, new Vector3(LeftX, 0f, SpawnZ), SideWidth, 2, squad);
                 nextPickup = t + 0.7f; // keep the +1 stream from spawning inside the arch
             }
             if (rightOpen)
             {
-                ShootableGate.Spawn(field, new Vector3(RightX, 0f, SpawnZ), CorridorWidth, 3 + Config.level, GateStep * 0.8f, 60f, squad);
+                ShootableGate.Spawn(field, new Vector3(RightX, 0f, SpawnZ), SideWidth, 3 + Config.level, GateStep * 0.8f, 60f, squad);
                 nextCrate = Mathf.Max(nextCrate, t + 2.5f);
             }
-            if (leftOpen && rightOpen && GameManager.I) GameManager.I.UI.ShowBanner("PICK A GATE!", UiTheme.Current.gold);
+            if (leftOpen && rightOpen && Config.level == Unlocks.ChoiceGate && GameManager.I) GameManager.I.UI.ShowBanner("PICK A GATE!", UiTheme.Current.gold);
         }
 
         void SpawnCrate(float z)

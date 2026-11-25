@@ -116,16 +116,18 @@ namespace RecruitRush
             Squad.Firing = true;
             UI.HideLobby();
             Cam.BlendToGame(); // starts together with the lobby UI exit so both land at once
-            if (LevelCaption != null)
+            if (StartBanner != null)
             {
                 var th = UiTheme.Current;
-                Color c = Unlocks.NewAt(Level) != null ? th.gold : Config.beat == LevelBeat.Elite ? th.red : Config.beat == LevelBeat.Breather ? th.green : th.gold;
-                UI.ShowBanner(LevelCaption, c);
+                UI.ShowBanner(StartBanner, Unlocks.NewAt(Level) != null ? th.gold : th.red);
             }
         }
 
         /// <summary>Lobby / start caption: what this level unlocks, otherwise its scenario (from level 3).</summary>
         string LevelCaption => Unlocks.NewAt(Level) ?? (Level >= 3 ? Config.Tag : null);
+
+        /// <summary>Start-of-run banner: only news (an unlock) or an elite warning; the scenario tag lives under PLAY.</summary>
+        string StartBanner => Unlocks.NewAt(Level) ?? (Config.beat == LevelBeat.Elite ? Config.Tag : null);
 
         int StartCount => Config.startCount + MetaProgress.BonusSoldiers;
 
@@ -210,7 +212,6 @@ namespace RecruitRush
         public void OnFinalWave()
         {
             Debug.Log($"[WAVE] final wave, squad={Squad.Count}");
-            UI.ShowBanner("FINAL WAVE!", UiTheme.Current.red);
         }
 
         public void OnBossSpawned(Boss boss)

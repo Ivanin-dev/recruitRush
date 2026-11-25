@@ -99,7 +99,7 @@ namespace RecruitRush
             if (gm)
             {
                 if (gm.Cam) gm.Cam.Shake(0.35f);
-                gm.UI.ShowBanner("BOSS ENRAGED!", UiTheme.Current.orange);
+                if (gm.Level == Unlocks.BossRage) gm.UI.ShowBanner("BOSS ENRAGED!", UiTheme.Current.orange);
                 if (gm.Director) gm.Director.SpawnAdds(4 + gm.Level / 3);
             }
             OnEnrage();

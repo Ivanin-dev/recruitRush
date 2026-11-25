@@ -87,26 +87,29 @@ namespace RecruitRush
         {
             // 1) Mark the corridor the squad is standing in.
             float lane = LaneCenter(squad.transform.position.x);
-            float half = LevelDirector.CorridorWidth * 0.5f;
+            float laneW = LevelDirector.LaneWidth(lane), half = laneW * 0.5f;
             float z0 = squad.transform.position.z - 3f, z1 = transform.position.z - depth;
-            var stripe = Art.Box("StrafeMark", null, new Vector3(lane, 0.06f, (z0 + z1) * 0.5f),
-                new Vector3(LevelDirector.CorridorWidth - 0.3f, 0.01f, z1 - z0), Art.Translucent(new Color(Danger.r, Danger.g, Danger.b, 0.35f)), null, false);
-            var edges = new GameObject("StrafeEdges");
+            // Steady (no blinking): a faint lane-wide stripe with solid edges, and a bright fill that sweeps from the
+            // gunship down to the squad as the timer. When the fill reaches the squad, the gun opens up.
+            float len = z1 - z0;
+            var mark = new GameObject("StrafeMark").transform;
+            mark.position = new Vector3(lane, 0f, 0f);
+            Art.Box("Stripe", mark, new Vector3(0f, 0.06f, (z0 + z1) * 0.5f), new Vector3(laneW - 0.3f, 0.01f, len),
+                Art.Translucent(new Color(Danger.r, Danger.g, Danger.b, 0.25f)), null, false);
             foreach (int s in new[] { -1, 1 })
-                Art.Box("Edge", edges.transform, new Vector3(lane + s * (half - 0.15f), 0.07f, (z0 + z1) * 0.5f),
-                    new Vector3(0.18f, 0.01f, z1 - z0), Art.Emissive(Danger, 2f), null, false);
+                Art.Box("Edge", mark, new Vector3(s * (half - 0.15f), 0.07f, (z0 + z1) * 0.5f), new Vector3(0.18f, 0.01f, len), Art.Emissive(Danger, 2f), null, false);
+            var fill = Art.Box("Fill", mark, new Vector3(0f, 0.065f, z1), new Vector3(laneW - 0.6f, 0.01f, 0.01f),
+                Art.Translucent(new Color(Danger.r, Danger.g * 1.6f, Danger.b, 0.45f)), null, false).transform;
 
             float warn = Enraged ? 0.8f : 1.1f;
-            for (float t = 0f; t < warn; t += Time.deltaTime)
+            for (float t = 0f; t < warn && Alive; t += Time.deltaTime)
             {
-                bool on = t < warn * 0.6f || Mathf.Repeat(t * 10f, 1f) < 0.6f;
-                stripe.SetActive(on);
-                edges.SetActive(on);
-                if (!Alive) break;
+                float k = t / warn, l = len * k;
+                fill.localScale = new Vector3(laneW - 0.6f, 0.01f, Mathf.Max(0.01f, l));
+                fill.localPosition = new Vector3(0f, 0.065f, z1 - l * 0.5f);
                 yield return null;
             }
-            Destroy(stripe);
-            Destroy(edges);
+            Destroy(mark.gameObject);
             if (!Alive) yield break;
 
             // 2) Rake the corridor from the far end down to the squad's line.

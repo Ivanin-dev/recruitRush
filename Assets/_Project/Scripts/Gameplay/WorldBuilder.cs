@@ -72,7 +72,7 @@ namespace RecruitRush
             // Lane slabs: one calm value; meaning is carried by the objects (gates, targets), not by paint.
             float[] lanes = { LevelDirector.LeftX, LevelDirector.MidX, LevelDirector.RightX };
             for (int i = 0; i < 3; i++)
-                Art.Box("Lane", root, new Vector3(lanes[i], 0.02f, mid), new Vector3(5.6f, 0.02f, len), Art.Lit(LaneSlab), null, false);
+                Art.Box("Lane", root, new Vector3(lanes[i], 0.02f, mid), new Vector3(i == 1 ? 5.6f : LevelDirector.SideWidth + 0.3f, 0.02f, len), Art.Lit(LaneSlab), null, false);
 
             // Corridor walls between the lanes, from the barricade line to the horizon.
             float wallStart = LevelDirector.ExitZ - 0.4f, wallLen = 100f;
