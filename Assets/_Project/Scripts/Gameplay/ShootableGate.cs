@@ -24,7 +24,8 @@ namespace RecruitRush
         /// <summary>Set for a march gate pair: the gate only counts for a squad on its own side of this X.</summary>
         public float splitX = float.NaN;
 
-        public static bool OnSide(float splitX, float gateX, float squadX) => float.IsNaN(splitX) || (squadX - splitX) * (gateX - splitX) > 0f;
+        // Exactly on the split counts for the left gate, so standing on the seam never dodges both.
+        public static bool OnSide(float splitX, float gateX, float squadX) => float.IsNaN(splitX) || (squadX <= splitX) == (gateX < splitX);
 
         public static ShootableGate Spawn(Transform parent, Vector3 pos, float width, float startValue, float growthStep, float cap, PlayerSquad squad)
         {
