@@ -220,14 +220,21 @@ namespace RecruitRush
 
         // ---------------- Show / hide ----------------
 
-        public void Show(int level)
+        public void Show(int level, string tag = null)
         {
             this.level = level;
             gameObject.SetActive(true);
             hiding = false;
             group.alpha = 1f;
             group.blocksRaycasts = true;
-            playSub.text = "LEVEL " + level;
+            // Long scenario captions stay on one line: TMP auto-size shrinks them inside the PLAY button.
+            playSub.text = string.IsNullOrEmpty(tag) ? "LEVEL " + level : "LEVEL " + level + "  " + tag;
+            playSub.enableAutoSizing = !string.IsNullOrEmpty(tag);
+            if (playSub.enableAutoSizing)
+            {
+                playSub.fontSizeMax = playSub.fontSize;
+                playSub.fontSizeMin = playSub.fontSize * 0.5f;
+            }
             hand.gameObject.SetActive(level <= 2);
             BuildRoad();
             Refresh();
@@ -260,7 +267,9 @@ namespace RecruitRush
             for (int i = 0; i < 3; i++)
             {
                 var u = Order[i];
-                tiles[i].SetState(MetaProgress.Level(u), Effect(u), MetaProgress.Cost(u), c, MetaProgress.CanAfford(u), MetaProgress.Maxed(u));
+                bool open = MetaProgress.Unlocked(u, level);
+                tiles[i].SetState(MetaProgress.Level(u), Effect(u), MetaProgress.Cost(u), c, open && MetaProgress.CanAfford(u), MetaProgress.Maxed(u),
+                    open ? 0 : Unlocks.UpgradeLevel(u));
             }
         }
 

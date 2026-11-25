@@ -93,6 +93,37 @@ namespace RecruitRush
             return go;
         }
 
+        /// <summary>
+        /// Keeps a world text inside <paramref name="maxWidth"/> meters: the box gets that width and TMP auto-size
+        /// shrinks the font (down to 40%) instead of letting long values spill out of their gate / crate / plate.
+        /// </summary>
+        public static TMPro.TextMeshPro Fit(TMPro.TextMeshPro tm, float maxWidth)
+        {
+            float size = tm.fontSize;
+            tm.rectTransform.sizeDelta = new Vector2(maxWidth, tm.rectTransform.sizeDelta.y);
+            tm.enableAutoSizing = true;
+            tm.fontSizeMax = size;
+            tm.fontSizeMin = size * 0.4f;
+            return tm;
+        }
+
+        /// <summary>
+        /// A floating label on a dark rounded-ish plate (camera-facing): readable over the light road, sized to the
+        /// text and capped at <paramref name="maxWidth"/>. Returns the text so callers can update it.
+        /// </summary>
+        public static TMPro.TextMeshPro Tag(string name, Transform parent, Vector3 localPos, string text, float height, Color color, float maxWidth)
+        {
+            var root = new GameObject(name).transform;
+            root.SetParent(parent, false);
+            root.localPosition = localPos;
+            root.gameObject.AddComponent<Billboard>();
+            var tm = Fit(Text("Text", root, new Vector3(0f, 0f, -0.03f), text, height, color), maxWidth - height * 0.6f);
+            float w = Mathf.Min(maxWidth, tm.GetPreferredValues(text, 100f, 10f).x + height * 0.9f);
+            Box("Plate", root, Vector3.zero, new Vector3(Mathf.Max(w, height * 1.8f), height * 1.45f, 0.04f),
+                Lit(UiTheme.Current.slateFace), null, false);
+            return tm;
+        }
+
         /// <summary>World-space text. <paramref name="height"/> is the approximate line height in meters.</summary>
         public static TMPro.TextMeshPro Text(string name, Transform parent, Vector3 localPos, string text, float height, Color color)
         {

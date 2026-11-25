@@ -10,7 +10,7 @@ namespace RecruitRush
     public class CameraFollow : MonoBehaviour
     {
         public PlayerSquad squad;
-        public Vector3 offset = new(0f, 25f, -13.5f);
+        public Vector3 offset = new(0f, 27.5f, -14.8f); // pulled back a bit for the 21 m road
         public float lookAhead = 17f;
 
         [Header("Lobby close-up")]
@@ -20,6 +20,8 @@ namespace RecruitRush
         [Tooltip("Extra pull-back per meter of crowd radius, so a big squad still fits between the HUD and the dock.")]
         public float lobbyZoomPerMeter = 0.13f;
         public float blendDuration = 0.75f;
+
+        const float XFollow = 0.35f;
 
         Vector3 basePos, vel;
         float shake;
@@ -63,11 +65,12 @@ namespace RecruitRush
         void Desired(out Vector3 pos, out Vector3 look)
         {
             Vector3 sp = squad.transform.position;
-            Vector3 center = new(sp.x * 0.2f, 0f, sp.z);
+            // Follows the squad sideways more than before: on the wide road it must stay on screen at the shoulders.
+            Vector3 center = new(sp.x * XFollow, 0f, sp.z);
 
             float zoom = 1f + squad.Radius * 0.02f;
             Vector3 gamePos = center + offset * zoom;
-            Vector3 gameLook = new(sp.x * 0.2f, 0f, sp.z + lookAhead);
+            Vector3 gameLook = new(sp.x * XFollow, 0f, sp.z + lookAhead);
 
             if (lobby <= 0f)
             {
@@ -77,7 +80,7 @@ namespace RecruitRush
             }
             float lobbyZoom = 1f + squad.Radius * lobbyZoomPerMeter;
             Vector3 lobbyPos = center + lobbyOffset * lobbyZoom;
-            Vector3 lobbyLook = new(sp.x * 0.2f, 0f, sp.z + lobbyLookAhead);
+            Vector3 lobbyLook = new(sp.x * XFollow, 0f, sp.z + lobbyLookAhead);
             pos = Vector3.Lerp(gamePos, lobbyPos, lobby);
             look = Vector3.Lerp(gameLook, lobbyLook, lobby);
         }

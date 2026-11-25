@@ -78,7 +78,34 @@ namespace RecruitRush
                 Fx.Sparks(transform.position + new Vector3(Random.Range(-halfWidth, halfWidth) * 0.7f, Random.Range(0.8f, hitHeight * 1.5f), -depth),
                     new Color(1f, 0.8f, 0.4f), 3);
             if (Hp <= 0f) Die();
+            else if (!Enraged && Hp <= MaxHp * 0.5f && GameManager.I && GameManager.I.Level >= Unlocks.BossRage) Enrage();
         }
+
+        public bool Enraged { get; private set; }
+
+        /// <summary>
+        /// Half HP: the boss attacks faster, calls in a pack of reinforcements and its bar turns orange.
+        /// Subclasses add their own twist in <see cref="OnEnrage"/>.
+        /// </summary>
+        void Enrage()
+        {
+            Enraged = true;
+            interval *= 0.65f;
+            hpFill.GetComponent<MeshRenderer>().sharedMaterial = Art.Glow(new Color(1f, 0.5f, 0.1f));
+            ExplosionFX.Spawn(transform.position + Vector3.up * 2f, 2.5f, false);
+            Sfx.Boom(1.5f);
+            Haptics.Heavy();
+            var gm = GameManager.I;
+            if (gm)
+            {
+                if (gm.Cam) gm.Cam.Shake(0.35f);
+                gm.UI.ShowBanner("BOSS ENRAGED!", UiTheme.Current.orange);
+                if (gm.Director) gm.Director.SpawnAdds(4 + gm.Level / 3);
+            }
+            OnEnrage();
+        }
+
+        protected virtual void OnEnrage() { }
 
         protected virtual void Update()
         {

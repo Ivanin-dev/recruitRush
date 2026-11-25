@@ -43,6 +43,7 @@ namespace RecruitRush
             t.muzzle.SetParent(t.gun, false);
             t.muzzle.localPosition = new Vector3(0f, 0.05f, -0.95f);
             t.hpText = Art.Text("Hp", go.transform, new Vector3(0f, 1.5f, 0f), Mathf.CeilToInt(hp).ToString(), 0.45f, Color.white);
+            Art.Fit(t.hpText, 2f);
             t.hpText.gameObject.AddComponent<Billboard>();
             return t;
         }

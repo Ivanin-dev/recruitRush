@@ -59,7 +59,7 @@ namespace RecruitRush
                 yield return null;
             }
             transform.position = home;
-            if (animator) animator.speed = 0.55f;
+            if (animator) animator.speed = Enraged ? 0.75f : 0.55f;
             if (!Alive) yield break;
 
             // Shockwave rolls from the giant's feet into the crowd.
@@ -71,6 +71,12 @@ namespace RecruitRush
                 yield return new WaitForSeconds(0.06f);
             }
             HitSquad(target, killsPerHit, 0.6f);
+        }
+
+        protected override void OnEnrage()
+        {
+            moveSpeed *= 1.3f;
+            if (animator) animator.speed = 0.75f;
         }
 
         protected override IEnumerator DeathSequence()

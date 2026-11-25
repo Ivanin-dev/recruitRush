@@ -10,6 +10,8 @@ namespace RecruitRush
         public enum State { Ready, Playing, Win, Lose }
 
         const string LevelKey = "rr_level";
+        // Losses in a row on the current level: ease its pressure and drop a hard modifier (see LevelConfig.For).
+        const string FailsKey = "rr_fails", FailsLevelKey = "rr_fails_level";
         /// <summary>One coin drops for every N kills during a run (banked immediately).</summary>
         const int KillsPerCoin = 2;
 
@@ -31,7 +33,9 @@ namespace RecruitRush
         public int Kills { get; private set; }
         /// <summary>Shared tracer pool (squad bullets and enemy fire).</summary>
         public Tracers Tracers { get; private set; }
-        public float WorldSpeed => Current == State.Playing ? conveyorSpeed : 0f;
+        public float WorldSpeed => Current == State.Playing
+            ? conveyorSpeed * (Config != null ? Config.speedMul : 1f) * (Director && Director.Marching ? LevelDirector.MarchSpeedMul : 1f)
+            : 0f;
 
         int lastCount, runCoins;
 
@@ -54,7 +58,8 @@ namespace RecruitRush
 
         void Start()
         {
-            Config = LevelConfig.For(Level);
+            int fails = PlayerPrefs.GetInt(FailsLevelKey, 0) == Level ? PlayerPrefs.GetInt(FailsKey, 0) : 0;
+            Config = LevelConfig.For(Level, fails);
             SceneLook.ApplyRuntime();
             var world = new GameObject("World").transform;
             WorldBuilder.Build(world, new System.Random(Level * 7919 + 1));
@@ -82,10 +87,10 @@ namespace RecruitRush
             UI.SetCoins(MetaProgress.Coins);
             UI.SetStats(Squad);
             UI.AttachSquad(Squad);
-            UI.ShowLobby(Level, Begin, BuyUpgrade);
+            UI.ShowLobby(Level, Begin, BuyUpgrade, LevelCaption);
             Squad.StatsChanged += () => UI.SetStats(Squad);
 
-            Debug.Log($"[LEVEL] {Level}: duration={Config.duration}s segments={Config.segments.Count} cap={Config.activeCap} turrets={Config.turretTimes.Length} bossHp={Config.bossHp}");
+            Debug.Log($"[LEVEL] {Level}: {Config.type} mod={Config.mod} beat={Config.beat} boss={Config.boss} fails={Config.fails} duration={Config.duration}s segments={Config.segments.Count} cap={Config.activeCap} turrets={Config.turretTimes.Length} bossHp={Config.bossHp}");
             if (Debug.isDebugBuild && CommandLine.Has("-autoplay")) gameObject.AddComponent<AutoPilot>();
         }
 
@@ -111,14 +116,23 @@ namespace RecruitRush
             Squad.Firing = true;
             UI.HideLobby();
             Cam.BlendToGame(); // starts together with the lobby UI exit so both land at once
+            if (LevelCaption != null)
+            {
+                var th = UiTheme.Current;
+                Color c = Unlocks.NewAt(Level) != null ? th.gold : Config.beat == LevelBeat.Elite ? th.red : Config.beat == LevelBeat.Breather ? th.green : th.gold;
+                UI.ShowBanner(LevelCaption, c);
+            }
         }
+
+        /// <summary>Lobby / start caption: what this level unlocks, otherwise its scenario (from level 3).</summary>
+        string LevelCaption => Unlocks.NewAt(Level) ?? (Level >= 3 ? Config.Tag : null);
 
         int StartCount => Config.startCount + MetaProgress.BonusSoldiers;
 
         /// <summary>Lobby purchase: spend coins and apply the upgrade to the waiting squad right away.</summary>
         bool BuyUpgrade(MetaUpgrade u)
         {
-            if (Current != State.Ready || !MetaProgress.TryBuy(u)) return false;
+            if (Current != State.Ready || !MetaProgress.Unlocked(u, Level) || !MetaProgress.TryBuy(u)) return false;
             Debug.Log($"[META] bought {u} -> Lv.{MetaProgress.Level(u)}, coins={MetaProgress.Coins}");
             if (u == MetaUpgrade.Squad)
             {
@@ -164,6 +178,32 @@ namespace RecruitRush
             Debug.Log($"[GATE] {value:+0;-0} -> squad={Squad.Count}");
         }
 
+        /// <summary>Gold multiplier gate: multiplies the squad (gain capped at <see cref="MultiplierGate.MaxGain"/>).</summary>
+        public void ApplyMultiplier(int factor, Vector3 at)
+        {
+            if (Current != State.Playing || factor <= 1) return;
+            int gain = Mathf.Min(Squad.Count * (factor - 1), MultiplierGate.MaxGain);
+            Squad.SetCount(Squad.Count + gain, at);
+            UI.OnMultiplier(Squad, factor);
+            Sfx.Upgrade();
+            Haptics.Medium();
+            Cam.Shake(0.12f);
+            Debug.Log($"[GATE] x{factor} (+{gain}) -> squad={Squad.Count}");
+        }
+
+        /// <summary>Red "/N" march gate: divides the squad (never below the commander alone).</summary>
+        public void ApplyDivide(int factor, Vector3 at)
+        {
+            if (Current != State.Playing || factor <= 1) return;
+            int keep = Mathf.Max(1, Mathf.CeilToInt(Squad.Count / (float)factor));
+            int lost = Squad.Count - keep;
+            Squad.SetCount(keep, at);
+            UI.OnGate(Squad, -lost);
+            Sfx.Boom(0.8f);
+            Haptics.Medium();
+            Debug.Log($"[GATE] /{factor} (-{lost}) -> squad={Squad.Count}");
+        }
+
         /// <summary>Conveyor speed for a lane: a side corridor is frozen while its barricade stands.</summary>
         public float LaneSpeed(float x) => Director && Director.IsLaneBlocked(x) ? 0f : WorldSpeed;
 
@@ -191,11 +231,12 @@ namespace RecruitRush
             Haptics.Heavy();
             StartCoroutine(SlowMotion());
             // Kill coins were already banked during the run; bank the level reward and chest now so they survive a quit.
-            int reward = 20 + Level * 5 + Squad.Count;
+            int reward = Mathf.RoundToInt((20 + Level * 5 + Squad.Count) * Config.rewardMul);
             int chest = MetaProgress.ChestAt(Level) ? MetaProgress.ChestCoins(Level) : 0;
             int before = MetaProgress.Coins;
             MetaProgress.Coins = before + reward + chest;
             PlayerPrefs.SetInt(LevelKey, Level + 1);
+            PlayerPrefs.SetInt(FailsKey, 0);
             PlayerPrefs.Save();
             var info = new ResultInfo
             {
@@ -219,6 +260,12 @@ namespace RecruitRush
             "Shoot a gate until it turns blue before standing under it",
             "Riflemen only hit their own lane: take them out or step aside",
             "Red barrels blow up the whole pack around them",
+            "Shoot bombers (glowing orange vests) early: they blow up their own pack",
+            "Shields soak weak bullets: upgrade DAMAGE or blow them up with a barrel",
+            "A red laser means a rifleman is about to fire: step out of his line",
+            "Stop the APC before its red DROP line, or it unloads a squad on you",
+            "Red circles on the road are artillery: step out before the shell lands",
+            "The gold x2 gate pays off with a big squad, the green one when you can shoot it up",
         };
 
         IEnumerator SlowMotion()
@@ -239,6 +286,8 @@ namespace RecruitRush
             if (count > 0 || Current != State.Playing) return;
             Current = State.Lose;
             Squad.Firing = false;
+            PlayerPrefs.SetInt(FailsLevelKey, Level);
+            PlayerPrefs.SetInt(FailsKey, Config.fails + 1);
             PlayerPrefs.Save();
             StartCoroutine(ShowResult(new ResultInfo
             {

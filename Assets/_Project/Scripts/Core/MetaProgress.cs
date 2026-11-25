@@ -13,16 +13,18 @@ namespace RecruitRush
         const string CoinsKey = "rr_coins";
         static readonly string[] LevelKeys = { "rr_meta_squad", "rr_meta_damage", "rr_meta_rate" };
 
-        public const int MaxLevel = 40;
-        static readonly int[] BaseCost = { 40, 60, 60 };
-        static readonly float[] CostGrowth = { 1.3f, 1.36f, 1.36f };
+        // Short, weak tracks on purpose: meta helps a little, the run itself (crates, gates, gun tiers) is what wins.
+        // Full Damage + Rate = x1.4 dmg, x1.3 rate; full Squad = +10 starting soldiers.
+        public const int MaxLevel = 10;
+        static readonly int[] BaseCost = { 50, 80, 80 };
+        static readonly float[] CostGrowth = { 1.45f, 1.5f, 1.5f };
 
         /// <summary>Extra starting soldiers per Squad level.</summary>
         public const int SoldiersPerLevel = 1;
         /// <summary>Damage multiplier gained per Damage level.</summary>
-        public const float DamagePerLevel = 0.1f;
+        public const float DamagePerLevel = 0.04f;
         /// <summary>Fire-rate multiplier gained per Fire Rate level.</summary>
-        public const float RatePerLevel = 0.08f;
+        public const float RatePerLevel = 0.03f;
 
         /// <summary>A reward chest every N cleared levels.</summary>
         public const int RewardEvery = 3;
@@ -33,10 +35,14 @@ namespace RecruitRush
             set => PlayerPrefs.SetInt(CoinsKey, Mathf.Max(0, value));
         }
 
-        /// <summary>Displayed level, starting at 1.</summary>
-        public static int Level(MetaUpgrade u) => PlayerPrefs.GetInt(LevelKeys[(int)u], 0) + 1;
+        /// <summary>Displayed level: levels bought, 0..<see cref="MaxLevel"/>.</summary>
+        public static int Level(MetaUpgrade u) => Bought(u);
 
-        static int Bought(MetaUpgrade u) => PlayerPrefs.GetInt(LevelKeys[(int)u], 0);
+        // Clamped: saves from the old 40-level tracks simply count as maxed.
+        static int Bought(MetaUpgrade u) => Mathf.Min(PlayerPrefs.GetInt(LevelKeys[(int)u], 0), MaxLevel);
+
+        /// <summary>Upgrades open up with progress (see <see cref="Unlocks"/>).</summary>
+        public static bool Unlocked(MetaUpgrade u, int level) => level >= Unlocks.UpgradeLevel(u);
 
         public static bool Maxed(MetaUpgrade u) => Bought(u) >= MaxLevel;
 

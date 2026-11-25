@@ -105,6 +105,12 @@ namespace RecruitRush
             WorldText.Callout(squad.transform.position + Vector3.up * 3.2f, (value > 0 ? "+" : "") + value, value > 0 ? th.green : th.red, 1.15f);
         }
 
+        /// <summary>Gold x2 gate passed: gold "x2" callout over the squad.</summary>
+        public void OnMultiplier(PlayerSquad squad, int factor)
+        {
+            WorldText.Callout(squad.transform.position + Vector3.up * 3.2f, "x" + factor, UiTheme.Current.gold, 1.3f);
+        }
+
         SquadBadge squadBadge;
 
         public void AttachSquad(PlayerSquad squad) => squadBadge = SquadBadge.Attach(squad);
@@ -121,12 +127,13 @@ namespace RecruitRush
         Action onPlay;
         Func<MetaUpgrade, bool> onBuy;
 
-        public void ShowLobby(int level, Action play, Func<MetaUpgrade, bool> buy)
+        /// <param name="tag">Level scenario caption shown under PLAY (e.g. "HORDE - SPRINT"); null for plain levels.</param>
+        public void ShowLobby(int level, Action play, Func<MetaUpgrade, bool> buy, string tag = null)
         {
             onPlay = play;
             onBuy = buy;
             Hud.SetCombatVisible(false);
-            lobby.Show(level);
+            lobby.Show(level, tag);
         }
 
         public void HideLobby()

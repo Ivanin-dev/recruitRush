@@ -76,6 +76,27 @@ namespace RecruitRush
             CountChanged?.Invoke(n);
         }
 
+        /// <summary>
+        /// How many soldiers stand inside an area (by the visible units, scaled up to the real head count when the
+        /// crowd is bigger than what is drawn). Area hazards use it so damage matches what the player sees.
+        /// </summary>
+        public int CountInside(System.Func<Vector3, bool> inside)
+        {
+            if (units.Count == 0) return 0;
+            int n = 0;
+            foreach (var u in units)
+                if (u.root && inside(u.root.position)) n++;
+            return Mathf.RoundToInt(n * (Count / (float)units.Count));
+        }
+
+        public int CountNear(Vector3 center, float radius)
+        {
+            float r2 = (radius + 0.15f) * (radius + 0.15f);
+            return CountInside(p => { float dx = p.x - center.x, dz = p.z - center.z; return dx * dx + dz * dz < r2; });
+        }
+
+        public int CountInBand(float minX, float maxX) => CountInside(p => p.x > minX - 0.15f && p.x < maxX + 0.15f);
+
         /// <summary>Total damage per second the squad puts out (soldiers + commander), used to size enemy waves.</summary>
         public float Dps
         {

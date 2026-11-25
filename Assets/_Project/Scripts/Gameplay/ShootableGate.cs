@@ -21,6 +21,11 @@ namespace RecruitRush
 
         public int Value => Mathf.FloorToInt(value);
 
+        /// <summary>Set for a march gate pair: the gate only counts for a squad on its own side of this X.</summary>
+        public float splitX = float.NaN;
+
+        public static bool OnSide(float splitX, float gateX, float squadX) => float.IsNaN(splitX) || (squadX - splitX) * (gateX - splitX) > 0f;
+
         public static ShootableGate Spawn(Transform parent, Vector3 pos, float width, float startValue, float growthStep, float cap, PlayerSquad squad)
         {
             var go = new GameObject("ShootableGate");
@@ -37,6 +42,7 @@ namespace RecruitRush
 
             g.arch = ArchKit.Build(go.transform, width, ArchHeight, startValue >= 0 ? ArchStatus.Positive : ArchStatus.Negative);
             g.label = Art.Text("Value", go.transform, new Vector3(0f, 1.45f, -0.25f), "", 1.05f, Color.white);
+            Art.Fit(g.label, width - 1.4f);
             g.label.transform.localRotation = Quaternion.Euler(35f, 0f, 0f);
             g.Refresh();
             return g;
@@ -84,7 +90,63 @@ namespace RecruitRush
             if (p.z > sp.z) return;
             done = true;
             Alive = false;
-            if (Mathf.Abs(sp.x - p.x) < halfWidth + squad.Radius * 0.3f) gm.ApplyGate(Value, p);
+            if (Mathf.Abs(sp.x - p.x) < halfWidth + squad.Radius * 0.3f && OnSide(splitX, p.x, sp.x)) gm.ApplyGate(Value, p);
+            Destroy(gameObject);
+        }
+    }
+
+    /// <summary>
+    /// Gold "x2" arch in a side corridor, paired with a growing +N gate in the other one: the player picks a lane.
+    /// Not a target (bullets fly through it). Doubling is capped so a huge squad does not snowball out of control.
+    /// </summary>
+    public class MultiplierGate : MonoBehaviour
+    {
+        public const int MaxGain = 60;
+
+        int factor;
+        bool divide;
+        float halfWidth;
+        public float splitX = float.NaN;
+        PlayerSquad squad;
+        ArchKit.Arch arch;
+        bool done;
+
+        /// <param name="divide">Red "/N" gate (march only): divides the squad instead.</param>
+        public static MultiplierGate Spawn(Transform parent, Vector3 pos, float width, int factor, PlayerSquad squad, bool divide = false)
+        {
+            var go = new GameObject("MultiplierGate");
+            go.transform.SetParent(parent, false);
+            go.transform.position = pos;
+            var g = go.AddComponent<MultiplierGate>();
+            g.factor = factor;
+            g.divide = divide;
+            g.halfWidth = width * 0.5f;
+            g.squad = squad;
+            g.arch = ArchKit.Build(go.transform, width, 3.1f, divide ? ArchStatus.Negative : ArchStatus.Bonus);
+            var label = Art.Text("Value", go.transform, new Vector3(0f, 1.45f, -0.25f), (divide ? "/" : "x") + factor, 1.2f, Color.white);
+            Art.Fit(label, width - 1.4f);
+            label.transform.localRotation = Quaternion.Euler(35f, 0f, 0f);
+            return g;
+        }
+
+        void Update()
+        {
+            var gm = GameManager.I;
+            if (done || squad == null || !gm) return;
+            Vector3 p = transform.position;
+            p.z -= gm.LaneSpeed(p.x) * Time.deltaTime;
+            transform.position = p;
+            // A slow shimmer so the gold arch reads as "bonus" next to the plain green gate.
+            arch.Tick(Time.deltaTime, (Mathf.Sin(Time.time * 4f) * 0.5f + 0.5f) * 0.35f);
+
+            Vector3 sp = squad.transform.position;
+            if (p.z > sp.z) return;
+            done = true;
+            if (Mathf.Abs(sp.x - p.x) < halfWidth + squad.Radius * 0.3f && ShootableGate.OnSide(splitX, p.x, sp.x))
+            {
+                if (divide) gm.ApplyDivide(factor, p);
+                else gm.ApplyMultiplier(factor, p);
+            }
             Destroy(gameObject);
         }
     }

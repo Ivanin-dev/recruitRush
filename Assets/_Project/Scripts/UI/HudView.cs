@@ -84,6 +84,12 @@ namespace RecruitRush
             bannerBlock = UiKit.Lipped(banner, "Block", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(820f, 128f),
                 th.red, th.redDark, 12f, 30f);
             bannerText = UiKit.Label(bannerBlock.face, "Text", "", th.banner, th.textMain);
+            // Long callouts shrink to fit the block instead of spilling past its edges.
+            bannerText.enableAutoSizing = true;
+            bannerText.fontSizeMax = bannerText.fontSize;
+            bannerText.fontSizeMin = bannerText.fontSize * 0.5f;
+            bannerText.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
+            bannerText.margin = new Vector4(44f, 0f, 44f, 0f);
             banner.gameObject.SetActive(false);
 
             SetCombatVisible(false);
@@ -148,7 +154,7 @@ namespace RecruitRush
         {
             var th = UiTheme.Current;
             bannerText.text = text;
-            float w = Mathf.Clamp(bannerText.GetPreferredValues(text).x + 120f, 520f, 980f);
+            float w = Mathf.Clamp(bannerText.GetPreferredValues(text, 9999f, 200f).x * bannerText.fontSizeMax / Mathf.Max(1f, bannerText.fontSize) + 120f, 520f, 960f);
             banner.sizeDelta = new Vector2(w, banner.sizeDelta.y);
             bannerBlock.root.sizeDelta = new Vector2(w, bannerBlock.root.sizeDelta.y);
             bannerBlock.SetColors(color, UiKit.Deep(color));

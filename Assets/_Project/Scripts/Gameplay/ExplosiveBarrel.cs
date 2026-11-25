@@ -62,16 +62,19 @@ namespace RecruitRush
             Destroy(gameObject);
         }
 
-        static void Boom(Vector3 pos, bool hurtEnemies)
+        static void Boom(Vector3 pos, bool hurtEnemies) => Blast(pos, hurtEnemies, BlastRadius);
+
+        /// <summary>Explosion FX + shake; with <paramref name="hurtEnemies"/> it kills every enemy within the radius.</summary>
+        public static void Blast(Vector3 pos, bool hurtEnemies, float radius)
         {
-            ExplosionFX.Spawn(pos + Vector3.up * 0.5f, 3f, true);
+            ExplosionFX.Spawn(pos + Vector3.up * 0.5f, 3f * radius / 2.6f, true);
             Sfx.Boom(1.8f);
             Haptics.Medium();
             var gm = GameManager.I;
             if (gm && gm.Cam) gm.Cam.Shake(0.25f);
             if (!hurtEnemies) return;
             foreach (var t in Target.All.ToArray())
-                if (t is Enemy && t.Alive && (t.transform.position - pos).sqrMagnitude < BlastRadius * BlastRadius)
+                if (t is Enemy && t.Alive && (t.transform.position - pos).sqrMagnitude < radius * radius)
                     t.TakeHit(9999f);
         }
     }

@@ -31,8 +31,15 @@ namespace RecruitRush
     /// <summary>Placeholder military environment: three-lane road between concrete barriers, desert and camp props.</summary>
     public static class WorldBuilder
     {
-        public const float HalfWidth = 9f;
+        // Wide enough for the march phase (full-width gate pairs, crowds to steer around); defense lanes stay at +-5.9.
+        public const float HalfWidth = 10.5f;
+
+        /// <summary>Corridor walls between the lanes: sunk into the road during the march, raised for the defense.</summary>
+        public static Transform Walls { get; private set; }
+        public const float WallsDownY = -1.1f;
         const float MinZ = -15f, Period = 90f;
+        /// <summary>Props start past the roadside barriers (road edge 9 m + barrier + half a tent), never on the road.</summary>
+        const float DecorMinX = HalfWidth + 2.4f;
 
         // Light, clean and calm: light sand, light concrete track, white markings. All low saturation, so the
         // saturated gameplay layer (blue squad, red enemies, green/red gates, gold rewards) is what the eye catches.
@@ -69,11 +76,13 @@ namespace RecruitRush
 
             // Corridor walls between the lanes, from the barricade line to the horizon.
             float wallStart = LevelDirector.ExitZ - 0.4f, wallLen = 100f;
+            Walls = new GameObject("Walls").transform;
+            Walls.SetParent(root, false);
             foreach (int s in Sides)
             {
-                Art.Box("CorridorWall", root, new Vector3(s * 2.95f, 0.45f, wallStart + wallLen * 0.5f), new Vector3(0.3f, 0.9f, wallLen), Art.Lit(Concrete));
-                Art.Box("WallCap", root, new Vector3(s * 2.95f, 0.92f, wallStart + wallLen * 0.5f), new Vector3(0.38f, 0.06f, wallLen), Art.Lit(ConcreteCap), null, false);
-                Art.Box("WallEnd", root, new Vector3(s * 2.95f, 0.6f, wallStart), new Vector3(0.45f, 1.2f, 0.45f), Art.Lit(WallEndColor));
+                Art.Box("CorridorWall", Walls, new Vector3(s * 2.95f, 0.45f, wallStart + wallLen * 0.5f), new Vector3(0.3f, 0.9f, wallLen), Art.Lit(Concrete));
+                Art.Box("WallCap", Walls, new Vector3(s * 2.95f, 0.92f, wallStart + wallLen * 0.5f), new Vector3(0.38f, 0.06f, wallLen), Art.Lit(ConcreteCap), null, false);
+                Art.Box("WallEnd", Walls, new Vector3(s * 2.95f, 0.6f, wallStart), new Vector3(0.45f, 1.2f, 0.45f), Art.Lit(WallEndColor));
             }
 
             for (float z = MinZ; z < MinZ + Period; z += 3f)
@@ -91,7 +100,7 @@ namespace RecruitRush
             for (float z = MinZ; z < MinZ + Period; z += Range(rng, 3f, 6f))
                 foreach (int s in Sides)
                     if (rng.NextDouble() < 0.8)
-                        scroller.Add(Decor(root, new Vector3(s * Range(rng, 6.5f, 15f), 0f, z), rng));
+                        scroller.Add(Decor(root, new Vector3(s * Range(rng, DecorMinX, 17f), 0f, z), rng));
         }
 
         static Transform Decor(Transform root, Vector3 pos, System.Random rng)
@@ -128,7 +137,7 @@ namespace RecruitRush
                             .transform.localRotation = Quaternion.Euler(r);
                     break;
                 default:
-                    if (Mathf.Abs(pos.x) > 9f)
+                    if (Mathf.Abs(pos.x) > DecorMinX + 1f)
                     {
                         foreach (int sx in Sides)
                             foreach (int sz in Sides)

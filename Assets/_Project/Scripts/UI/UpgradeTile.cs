@@ -138,10 +138,27 @@ namespace RecruitRush
             return tile;
         }
 
-        public void SetState(int level, string effect, int price, int coins, bool affordable, bool maxed)
+        /// <param name="unlockAt">0 when available; otherwise the level that opens it (tile shows a dimmed "LVL N").</param>
+        public void SetState(int level, string effect, int price, int coins, bool affordable, bool maxed, int unlockAt = 0)
         {
             var th = UiTheme.Current;
-            levelText.text = "Lv." + level;
+            if (unlockAt > 0)
+            {
+                levelText.text = "LOCKED";
+                effectText.text = effect;
+                priceStrip.SetColors(th.slateDeep, th.slateLip);
+                this.price.Set("LVL " + unlockAt, false);
+                this.price.text.color = th.textMuted;
+                UiKit.InkLabel(this.price.text, th.slateLip);
+                saving.gameObject.SetActive(false);
+                dot.gameObject.SetActive(false);
+                wasAffordable = false;
+                hop.enabled = false;
+                icon.color = new Color(0.55f, 0.58f, 0.68f, 0.7f);
+                button.button.interactable = false;
+                return;
+            }
+            levelText.text = "Lv." + level + "/" + MetaProgress.MaxLevel;
             effectText.text = maxed ? "" : effect;
 
             Color face = affordable ? th.green : maxed ? th.gold : th.slateDeep;

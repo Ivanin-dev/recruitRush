@@ -14,7 +14,7 @@ namespace RecruitRush
         AudioSource[] pool;
         int next;
         AudioClip shot, pickup, upgrade, boom, crateHit, lose;
-        float lastShot, lastPickup, lastHit, lastLose;
+        float lastShot, lastPickup, lastHit, lastLose, lastClank;
         public static bool Muted { get; set; }
 
         public static void Init()
@@ -136,6 +136,12 @@ namespace RecruitRush
         public static void CrateHit()
         {
             if (instance && Ready(ref instance.lastHit, 0.08f)) instance.Play(instance.crateHit, 0.3f, 1f, 0.15f);
+        }
+
+        /// <summary>Bullet glancing off armor or a shield: the crate thud pitched up into a metallic clank.</summary>
+        public static void Clank()
+        {
+            if (instance && Ready(ref instance.lastClank, 0.07f)) instance.Play(instance.crateHit, 0.28f, 1.9f, 0.12f);
         }
 
         public static void SoldierLost()
