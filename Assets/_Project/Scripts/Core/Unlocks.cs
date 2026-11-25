@@ -7,6 +7,8 @@ namespace RecruitRush
     public static class Unlocks
     {
         // Enemies and hazards
+        public const int JumpBarriers = 2;
+        public const int Drones = 4;
         public const int Bombers = 3;
         public const int ChoiceGate = 4;
         public const int Artillery = 5;
@@ -38,7 +40,8 @@ namespace RecruitRush
         public static string NewAt(int level) => level switch
         {
             Bombers => "NEW: BOMBERS",
-            ChoiceGate => "NEW: GATE PICK",
+            JumpBarriers => "NEW: JUMP BARRIERS",
+            Drones => "NEW: DRONES",
             Artillery => "NEW: ARTILLERY",
             Shields => "NEW: SHIELDS",
             Modifiers => "NEW: LEVEL TWISTS",

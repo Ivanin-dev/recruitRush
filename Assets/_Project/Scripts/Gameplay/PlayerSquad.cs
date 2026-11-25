@@ -62,6 +62,53 @@ namespace RecruitRush
             SetCount(count, transform.position);
         }
 
+        // ---- Jumping: tap to hop (clears barriers, shockwaves, mines, wire; reaches drones). Ramps launch a super jump
+        // high enough to shoot the gunship.
+        public const float JumpDuration = 0.75f, JumpPeak = 1.9f, SuperDuration = 1.8f, SuperPeak = 5f;
+        float jumpT = -1f, jumpDur, jumpPeak;
+
+        /// <summary>Current lift of the whole squad above the road.</summary>
+        public float JumpHeight { get; private set; }
+        /// <summary>High enough to clear ground hazards.</summary>
+        public bool Airborne => JumpHeight > 0.5f;
+
+        public void Jump()
+        {
+            if (jumpT >= 0f || Count <= 0) return;
+            StartJump(JumpDuration, JumpPeak);
+        }
+
+        public void SuperJump()
+        {
+            if (Count <= 0) return;
+            StartJump(SuperDuration, SuperPeak);
+            Fx.Sparks(transform.position + Vector3.up * 0.3f, UiTheme.Current.gold, 16);
+        }
+
+        void StartJump(float dur, float peak)
+        {
+            jumpT = 0f;
+            jumpDur = dur;
+            jumpPeak = peak;
+            Sfx.Pickup();
+            Haptics.Light();
+        }
+
+        void TickJump(float dt)
+        {
+            if (jumpT < 0f) return;
+            jumpT += dt;
+            float k = jumpT / jumpDur;
+            if (k >= 1f)
+            {
+                jumpT = -1f;
+                JumpHeight = 0f;
+                Fx.Sparks(transform.position + Vector3.up * 0.1f, new Color(0.85f, 0.8f, 0.7f), 6); // landing dust
+                return;
+            }
+            JumpHeight = Mathf.Sin(k * Mathf.PI) * jumpPeak;
+        }
+
         public void Steer(float dx) => targetX += dx;
         public void SetTargetX(float x) => targetX = x;
         public void Add(int n) => SetCount(Count + n, transform.position);
@@ -205,6 +252,7 @@ namespace RecruitRush
         {
             float dt = Time.deltaTime;
             Vector3 p = transform.position;
+            TickJump(dt);
             float limit = Mathf.Max(0f, roadHalfWidth - Radius);
             targetX = Mathf.Clamp(targetX, -limit, limit);
             p.x = Mathf.Lerp(p.x, targetX, 1f - Mathf.Exp(-14f * dt));
@@ -233,7 +281,7 @@ namespace RecruitRush
                     np = Vector3.Lerp(cur, target, follow);
                     bob = running && !u.gun ? 0f : running ? Mathf.Abs(Mathf.Sin(time * 13f + u.phase)) * 0.08f : 0f;
                 }
-                u.root.SetPositionAndRotation(new Vector3(np.x, bob, np.z), Quaternion.identity);
+                u.root.SetPositionAndRotation(new Vector3(np.x, bob + JumpHeight, np.z), Quaternion.identity);
             }
 
             if (Firing) Shoot(dt);
@@ -275,7 +323,7 @@ namespace RecruitRush
         void FireOne(Vector3 muzzle, float damage, Color color, bool flash, bool heavy = false)
         {
             if (flash) Fx.Muzzle(muzzle, color);
-            var target = Target.FindInSector(muzzle.x, muzzle.z, range, AimSector);
+            var target = Target.FindInSector(muzzle.x, muzzle.z, range, AimSector, JumpHeight);
             Vector3 end;
             if (target)
             {

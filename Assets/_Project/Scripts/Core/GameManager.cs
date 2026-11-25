@@ -104,8 +104,27 @@ namespace RecruitRush
                     if (UI.Paused) break;
                     if (SwipeInput.Pressed)
                         Squad.Steer(SwipeInput.DeltaX01 * WorldBuilder.HalfWidth * 2f * steerSensitivity);
+                    DetectTap();
                     UI.SetProgress(Director.Time01, Director.FinalPhase);
                     break;
+            }
+        }
+
+        // Tap = a short press that barely moves (a drag steers). Taps jump the squad.
+        float tapStart = -1f, tapTravel;
+
+        void DetectTap()
+        {
+            if (SwipeInput.PressedThisFrame && !SwipeInput.OverUI)
+            {
+                tapStart = Time.unscaledTime;
+                tapTravel = 0f;
+            }
+            if (tapStart >= 0f && SwipeInput.Pressed) tapTravel += Mathf.Abs(SwipeInput.DeltaX01);
+            if (SwipeInput.ReleasedThisFrame && tapStart >= 0f)
+            {
+                if (Time.unscaledTime - tapStart < 0.25f && tapTravel < 0.035f) Squad.Jump();
+                tapStart = -1f;
             }
         }
 
@@ -127,7 +146,7 @@ namespace RecruitRush
         string LevelCaption => Unlocks.NewAt(Level) ?? (Level >= 3 ? Config.Tag : null);
 
         /// <summary>Start-of-run banner: only news (an unlock) or an elite warning; the scenario tag lives under PLAY.</summary>
-        string StartBanner => Level == 1 ? "SWIPE TO STEER" : Unlocks.NewAt(Level) ?? (Config.beat == LevelBeat.Elite ? Config.Tag : null);
+        string StartBanner => Level == 1 ? "SWIPE TO STEER, TAP TO JUMP" : Unlocks.NewAt(Level) ?? (Config.beat == LevelBeat.Elite ? Config.Tag : null);
 
         int StartCount => Config.startCount + MetaProgress.BonusSoldiers;
 

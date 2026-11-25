@@ -63,6 +63,8 @@ namespace RecruitRush
         public float[] turretTimes;
         public float[] artilleryTimes;
         public float[] apcTimes = new float[0];
+        public float[] barrierTimes = new float[0];
+        public float[] droneTimes = new float[0];
         public float turretHp;
         public float bossHp;
         public int bossKills;
@@ -324,6 +326,10 @@ namespace RecruitRush
                     : level >= 6 ? new[] { 0.3f, 0.55f, 0.8f } : new[] { 0.4f, 0.75f };
             else c.artilleryTimes = new float[0];
 
+            // Reaction checks: jump barriers across the road, drones that only a jump can reach.
+            if (level >= Unlocks.JumpBarriers) c.barrierTimes = level >= 6 ? new[] { 0.22f, 0.5f, 0.78f } : new[] { 0.3f, 0.72f };
+            if (level >= Unlocks.Drones) c.droneTimes = level >= 7 ? new[] { 0.35f, 0.7f } : new[] { 0.45f };
+
             // APCs from level 6: one per run (two on elite levels), never on the sniper line (it has its own threats).
             if (level >= Unlocks.Apc && c.type != LevelType.Snipers)
             {
@@ -403,7 +409,7 @@ namespace RecruitRush
         /// <summary>Seconds of the squad's full fire an enemy crowd soaks in total: about 70% of it gets shot down.</summary>
         const float CrowdSoak = 3.2f;
 
-        enum MarchKind { Recruits, Gates, Wire, Mines, Crowd }
+        enum MarchKind { Recruits, Gates, Wire, Mines, Crowd, Barrier }
 
         struct MarchBeat
         {
@@ -428,7 +434,7 @@ namespace RecruitRush
             Beat(3.0f, lv >= 2 ? MarchKind.Wire : MarchKind.Recruits);
             Beat(4.3f, MarchKind.Crowd);
             Beat(5.8f, lv >= 3 ? MarchKind.Mines : MarchKind.Recruits);
-            Beat(6.4f, MarchKind.Recruits);
+            Beat(6.4f, lv >= Unlocks.JumpBarriers ? MarchKind.Barrier : MarchKind.Recruits);
             Beat(7.4f, MarchKind.Gates);
             Beat(8.8f, MarchKind.Crowd);
             Beat(10.2f, MarchKind.Gates);
@@ -448,6 +454,7 @@ namespace RecruitRush
                     case MarchKind.Wire: MarchHazardAt(MarchHazard.Kind.Wire); break;
                     case MarchKind.Mines: MarchHazardAt(MarchHazard.Kind.Mines); break;
                     case MarchKind.Crowd: MarchCrowd(crowds++); break;
+                    case MarchKind.Barrier: JumpBarrier.Spawn(field, SpawnZ, squad); break;
                 }
             }
             // Done once the last object has had time to reach the squad's line.
@@ -576,6 +583,7 @@ namespace RecruitRush
                 RunSegment();
                 DrainQueue();
                 Artillery(gm);
+                ReactionChecks();
                 if (apcIndex < Config.apcTimes.Length && Time01 >= Config.apcTimes[apcIndex])
                 {
                     apcIndex++;
@@ -631,6 +639,31 @@ namespace RecruitRush
             float troopHp = Mathf.Max(Config.EnemyHpAt(t), 0.5f * SquadDps / troops);
             Apc.Spawn(field, new Vector3(MidX + Random.Range(-0.8f, 0.8f), 0f, SpawnZ + 2f), Mathf.Round(hp), troops, troopHp, Config.enemyRunSpeed, squad);
             if (first && Config.level == Unlocks.Apc) gm.UI.ShowBanner("APC! STOP IT BEFORE THE LINE", UiTheme.Current.red);
+        }
+
+        int barrierIndex, droneIndex;
+
+        void ReactionChecks()
+        {
+            var c = Config;
+            if (barrierIndex < c.barrierTimes.Length && Time01 >= c.barrierTimes[barrierIndex])
+            {
+                barrierIndex++;
+                JumpBarrier.Spawn(field, SpawnZ, squad);
+            }
+            if (droneIndex < c.droneTimes.Length && Time01 >= c.droneTimes[droneIndex])
+            {
+                droneIndex++;
+                SpawnDrones(c.level >= 9 ? 3 : 2);
+                if (droneIndex == 1 && c.level == Unlocks.Drones && GameManager.I) GameManager.I.UI.ShowBanner("DRONES! TAP TO JUMP AND SHOOT", UiTheme.Current.red);
+            }
+        }
+
+        void SpawnDrones(int n)
+        {
+            float hp = Mathf.Max(Config.EnemyHpAt(t) * 4f, 0.15f * SquadDps);
+            for (int i = 0; i < n; i++)
+                Drone.Spawn(field, Random.Range(-WorldBuilder.HalfWidth + 2f, WorldBuilder.HalfWidth - 2f), hp, i % 2 == 1, squad);
         }
 
         void Artillery(GameManager gm)

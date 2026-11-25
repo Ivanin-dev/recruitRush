@@ -24,6 +24,15 @@ namespace RecruitRush
             }
         }
 
+        public static bool ReleasedThisFrame
+        {
+            get
+            {
+                var p = Pointer.current;
+                return p != null && p.press.wasReleasedThisFrame;
+            }
+        }
+
         /// <summary>True when the pointer is over a UI element (so a tap on a button doesn't also start the run).</summary>
         public static bool OverUI
         {

@@ -13,6 +13,7 @@ namespace RecruitRush
         string dir;
         float t, endT = -1f, bossT = -1f;
         bool shotStart, shot1, shot2, shot3, shotBoss, shotEnd, shotPause;
+        float nextHop;
 
         void Start()
         {
@@ -41,6 +42,10 @@ namespace RecruitRush
             if (gm.Current == GameManager.State.Playing)
             {
                 gm.Squad.SetTargetX(ChooseX());
+                // Hop over barriers just before they arrive; keep hopping while drones are up (and on gunship ramps).
+                foreach (var b in JumpBarrier.All)
+                    if (b.DistanceAhead > 0f && b.DistanceAhead < 2.2f) gm.Squad.Jump();
+                if (Drone.LiveCount > 0 && t > nextHop) { gm.Squad.Jump(); nextHop = t + 1f; }
                 if (!shotPause && t > 3.5f) { shotPause = true; StartCoroutine(PauseShot()); }
                 if (!shot1 && t > 6f) { shot1 = true; Shot("1_early"); }
                 if (!shot2 && t > 18f) { shot2 = true; Shot("2_mid"); }

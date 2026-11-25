@@ -287,7 +287,7 @@ namespace RecruitRush
                     var m = mines[i];
                     if (!m || m.position.z > sp.z) continue;
                     mines.RemoveAt(i);
-                    int hit = squad.Count > 0 ? squad.CountNear(m.position, 1.1f) : 0;
+                    int hit = squad.Count > 0 && !squad.Airborne ? squad.CountNear(m.position, 1.1f) : 0; // jumping clears mines
                     if (hit > 0)
                     {
                         int kills = Mathf.Min(hit, 3);
@@ -306,7 +306,7 @@ namespace RecruitRush
             if (!done && p.z <= sp.z)
             {
                 done = true;
-                if (squad.Count > 0)
+                if (squad.Count > 0 && !squad.Airborne) // jumping clears the wire
                 {
                     // Everyone inside the fence's span gets cut; capped so one fence never wipes a big squad.
                     int hit = squad.CountInBand(x0 + 0.2f, x1 - 0.2f);

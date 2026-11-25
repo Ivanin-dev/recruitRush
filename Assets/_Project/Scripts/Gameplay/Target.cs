@@ -13,6 +13,11 @@ namespace RecruitRush
         /// <summary>Distance from the pivot to the front face on Z.</summary>
         public float depth = 0.2f;
         public float hitHeight = 0.5f;
+        /// <summary>
+        /// 0 for ground targets. Air targets (drones, the gunship) can only be shot by a squad that is at least this
+        /// high in the air: a tap-jump reaches drones, only a ramp launch reaches the gunship.
+        /// </summary>
+        public float airHeight;
 
         public bool Alive { get; protected set; } = true;
         public float FrontZ => transform.position.z - depth;
@@ -26,7 +31,7 @@ namespace RecruitRush
         /// Best target in a forward sector: anything whose body lies within <paramref name="sector"/> meters of the
         /// shooter's line. Prefers what's closest, with sideways distance weighted extra so soldiers still mostly fire ahead.
         /// </summary>
-        public static Target FindInSector(float x, float z, float range, float sector)
+        public static Target FindInSector(float x, float z, float range, float sector, float shooterHeight = 0f)
         {
             Target best = null;
             float bestScore = float.MaxValue;
@@ -34,12 +39,15 @@ namespace RecruitRush
             {
                 var t = All[i];
                 if (!t.Alive) continue;
+                bool air = t.airHeight > 0f;
+                if (air && shooterHeight + 0.3f < t.airHeight) continue; // out of reach from down here
                 Vector3 p = t.transform.position;
                 float dz = p.z - t.depth - z;
                 if (dz < -0.5f || dz > range) continue;
                 float side = Mathf.Max(0f, Mathf.Abs(p.x - x) - t.halfWidth);
                 if (side > sector) continue;
                 float score = dz + side * 3f;
+                if (air) score -= 1000f; // mid-air the squad goes for what it can only hit now
                 if (score < bestScore)
                 {
                     bestScore = score;
