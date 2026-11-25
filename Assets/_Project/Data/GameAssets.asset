@@ -18,6 +18,7 @@ MonoBehaviour:
   fxSmoke: {fileID: 2100000, guid: ed77bc49227c8dc40920df31593687f7, type: 2}
   font: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   fontOutline: {fileID: 2100000, guid: d6bc939c700a69949a9b108901baddf4, type: 2}
+  fontHud: {fileID: 2100000, guid: 054dfa9c4042c8c46affecfb7b86e4c6, type: 2}
   playerSoldier: {fileID: 132888, guid: aa05473e4d04e834eb7a29b53251c8cf, type: 3}
   enemySoldier: {fileID: 100632, guid: 789396300d039cc4fa674d36eddb10a7, type: 3}
   heavySoldier: {fileID: 187294, guid: c119a327e0fdf4f4890b2d98da9e2914, type: 3}

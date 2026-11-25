@@ -34,15 +34,20 @@ namespace RecruitRush
         public const float HalfWidth = 9f;
         const float MinZ = -15f, Period = 90f;
 
-        static readonly Color Sand = new(0.86f, 0.76f, 0.55f);
-        static readonly Color Asphalt = new(0.34f, 0.34f, 0.36f);
-        static readonly Color LineColor = new(0.95f, 0.92f, 0.8f);
-        static readonly Color Concrete = new(0.78f, 0.77f, 0.72f);
-        static readonly Color Olive = new(0.4f, 0.43f, 0.26f);
-        static readonly Color TentColor = new(0.48f, 0.5f, 0.32f);
-        static readonly Color SandBag = new(0.76f, 0.68f, 0.48f);
-        static readonly Color Metal = new(0.35f, 0.37f, 0.36f);
-        static readonly Color Rust = new(0.62f, 0.25f, 0.18f);
+        // Light, clean and calm: light sand, light concrete track, white markings. All low saturation, so the
+        // saturated gameplay layer (blue squad, red enemies, green/red gates, gold rewards) is what the eye catches.
+        static readonly Color Sand = new(0.9f, 0.82f, 0.66f);
+        static readonly Color Asphalt = new(0.66f, 0.67f, 0.68f);      // track base (light concrete, slightly cool)
+        static readonly Color LaneSlab = new(0.76f, 0.76f, 0.75f);     // lane slabs: one value, no colored tints
+        static readonly Color LineColor = new(0.99f, 0.98f, 0.95f);
+        static readonly Color Concrete = new(0.94f, 0.92f, 0.87f);
+        static readonly Color ConcreteCap = new(0.82f, 0.8f, 0.76f);
+        static readonly Color WallEndColor = new(0.62f, 0.65f, 0.7f);
+        static readonly Color Olive = new(0.55f, 0.58f, 0.42f);
+        static readonly Color TentColor = new(0.66f, 0.66f, 0.5f);
+        static readonly Color SandBag = new(0.86f, 0.79f, 0.62f);
+        static readonly Color Metal = new(0.52f, 0.54f, 0.57f);
+        static readonly Color Rust = new(0.72f, 0.46f, 0.36f);
         static readonly int[] Sides = { -1, 1 };
 
         public static void Build(Transform root, System.Random rng)
@@ -57,19 +62,18 @@ namespace RecruitRush
             Art.Box("Ground", root, new Vector3(0f, -0.12f, mid), new Vector3(120f, 0.2f, len + 60f), Art.Lit(Sand));
             Art.Box("Road", root, new Vector3(0f, -0.05f, mid), new Vector3(HalfWidth * 2f + 0.4f, 0.1f, len), Art.Lit(Asphalt));
 
-            // Lane tints: blue = reinforcements, red = enemies, gold = upgrades.
-            Color[] tints = { new(0.3f, 0.42f, 0.6f), new(0.48f, 0.32f, 0.32f), new(0.55f, 0.48f, 0.3f) };
+            // Lane slabs: one calm value; meaning is carried by the objects (gates, targets), not by paint.
             float[] lanes = { LevelDirector.LeftX, LevelDirector.MidX, LevelDirector.RightX };
             for (int i = 0; i < 3; i++)
-                Art.Box("Lane", root, new Vector3(lanes[i], 0.02f, mid), new Vector3(5.6f, 0.02f, len), Art.Lit(tints[i]), null, false);
+                Art.Box("Lane", root, new Vector3(lanes[i], 0.02f, mid), new Vector3(5.6f, 0.02f, len), Art.Lit(LaneSlab), null, false);
 
             // Corridor walls between the lanes, from the barricade line to the horizon.
             float wallStart = LevelDirector.ExitZ - 0.4f, wallLen = 100f;
             foreach (int s in Sides)
             {
                 Art.Box("CorridorWall", root, new Vector3(s * 2.95f, 0.45f, wallStart + wallLen * 0.5f), new Vector3(0.3f, 0.9f, wallLen), Art.Lit(Concrete));
-                Art.Box("WallCap", root, new Vector3(s * 2.95f, 0.92f, wallStart + wallLen * 0.5f), new Vector3(0.38f, 0.06f, wallLen), Art.Lit(new Color(0.62f, 0.6f, 0.56f)), null, false);
-                Art.Box("WallEnd", root, new Vector3(s * 2.95f, 0.6f, wallStart), new Vector3(0.45f, 1.2f, 0.45f), Art.Lit(new Color(0.4f, 0.42f, 0.42f)));
+                Art.Box("WallCap", root, new Vector3(s * 2.95f, 0.92f, wallStart + wallLen * 0.5f), new Vector3(0.38f, 0.06f, wallLen), Art.Lit(ConcreteCap), null, false);
+                Art.Box("WallEnd", root, new Vector3(s * 2.95f, 0.6f, wallStart), new Vector3(0.45f, 1.2f, 0.45f), Art.Lit(WallEndColor));
             }
 
             for (float z = MinZ; z < MinZ + Period; z += 3f)

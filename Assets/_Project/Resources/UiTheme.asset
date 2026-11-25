@@ -1,0 +1,138 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a692e18b5298a7c409449d0d52036c64, type: 3}
+  m_Name: UiTheme
+  m_EditorClassIdentifier: Assembly-CSharp::RecruitRush.UiTheme
+  slateFace: {r: 0.1686275, g: 0.227451, b: 0.5254902, a: 1}
+  slateDeep: {r: 0.1333333, g: 0.1882353, b: 0.4588235, a: 1}
+  slateLip: {r: 0.0862745, g: 0.1215686, b: 0.3411765, a: 1}
+  slateTrack: {r: 0.0666667, g: 0.0941176, b: 0.2823529, a: 1}
+  edge: {r: 0.0784314, g: 0.1019608, b: 0.2666667, a: 1}
+  dim: {r: 0.055, g: 0.075, b: 0.2, a: 0.84}
+  shadow: {r: 0.05, g: 0.07, b: 0.24, a: 0.42}
+  textMain: {r: 1, g: 1, b: 1, a: 1}
+  textMuted: {r: 0.7490196, g: 0.7960784, b: 0.9411765, a: 1}
+  blue: {r: 0.1647059, g: 0.4823529, b: 1, a: 1}
+  blueDark: {r: 0.1647059, g: 0.2470588, b: 0.7686275, a: 1}
+  green: {r: 0.2470588, g: 0.7960784, b: 0.1803922, a: 1}
+  greenDark: {r: 0.1176471, g: 0.5411765, b: 0.227451, a: 1}
+  red: {r: 0.9490196, g: 0.2392157, b: 0.2392157, a: 1}
+  redDark: {r: 0.6588235, g: 0.0901961, b: 0.2470588, a: 1}
+  orange: {r: 1, g: 0.4156863, b: 0.2392157, a: 1}
+  orangeDark: {r: 0.7215686, g: 0.1882353, b: 0.1215686, a: 1}
+  gold: {r: 1, g: 0.6980392, b: 0.1176471, a: 1}
+  goldDark: {r: 0.8156863, g: 0.4156863, b: 0.0392157, a: 1}
+  goldText: {r: 1, g: 0.8784314, b: 0.4, a: 1}
+  font: {fileID: 0}
+  displayFontSource: {fileID: 0}
+  displayFontResource: Fonts/LilitaOne-Regular
+  textMaterial: {fileID: 0}
+  outlineWidth: 0.2
+  faceDilate: 0.18
+  shadowOffset: {x: 0, y: -0.8}
+  shadowDilate: 0.2
+  hudNumber: 56
+  levelBadge: 34
+  buffTag: 30
+  banner: 80
+  buttonPrimary: 96
+  buttonSecondary: 60
+  cardName: 30
+  cardLevel: 44
+  cardPrice: 48
+  title: 132
+  subtitle: 46
+  statNumber: 66
+  rewardNumber: 104
+  caption: 32
+  squadCount: 100
+  damageNumber: 0.62
+  damageCrit: 0.9
+  callout: 1.35
+  safeMargin: 28
+  gap: 16
+  corner: 28
+  cornerCard: 24
+  cornerChip: 16
+  buttonPadding: 32
+  iconGap: 12
+  coinIconScale: 0.62
+  edgeWidth: 0
+  rimWidth: 5
+  blockLip: 10
+  buttonLip: 20
+  pressSink: 0.75
+  topBarOffset: {x: 0, y: -30}
+  topBarHeight: 92
+  progressWidth: 230
+  buffSize: 88
+  buffRowY: -172
+  coinPill: {x: 250, y: 84}
+  playButton: {x: 660, y: 188}
+  playButtonY: 540
+  upgradeCard: {x: 304, y: 330}
+  upgradeRowY: 70
+  resultButton: {x: 660, y: 176}
+  faceTopLighten: 0.18
+  faceBottomDarken: 0.1
+  hueShiftTop: 12
+  hueShiftBottom: 10
+  glossAlpha: 0.18
+  contourDarken: 0.6
+  dropShadowBlur: 22
+  dropShadowOffset: 10
+  dropShadowAlpha: 0.42
+  titleGoldTop: {r: 1, g: 0.9490196, b: 0.4784314, a: 1}
+  titleGoldBottom: {r: 1, g: 0.6039216, b: 0.1019608, a: 1}
+  titleSilverTop: {r: 1, g: 1, b: 1, a: 1}
+  titleSilverBottom: {r: 0.7490196, g: 0.8313725, b: 1, a: 1}
+  titleOuterStroke: {r: 1, g: 1, b: 1, a: 0}
+  titleInnerStroke: 0.18
+  titleOuterDilate: 0.5
+  titleExtrude: 9
+  shineInterval: 2.6
+  shineDuration: 0.55
+  shineAlpha: 0
+  affordGlow: {r: 0.60784316, g: 1, b: 0.3529412, a: 1}
+  glowPulseSpeed: 3.2
+  glowMin: 0.18
+  glowMax: 0.75
+  pressScale: 0.96
+  pressDuration: 0.08
+  releaseDuration: 0.26
+  releaseOvershoot: 2.4
+  affordPulseAmp: 0.035
+  affordPulseSpeed: 4.5
+  counterDuration: 0.45
+  counterMaxDuration: 1.1
+  coinPunch: 1.28
+  badgePunch: 1.4
+  flashDuration: 0.35
+  progressSpeed: 0.6
+  bannerDuration: 1.4
+  damageLife: 0.75
+  damageRise: 1.5
+  damageInterval: 0.3
+  damageMaxActive: 18
+  calloutLife: 1.15
+  squadPunchGain: 1.3
+  squadPunchLoss: 0.86
+  coinFlyDuration: 0.62
+  coinIcon: {fileID: 0}
+  soldierIcon: {fileID: 0}
+  damageIcon: {fileID: 0}
+  rateIcon: {fileID: 0}
+  weaponIcon: {fileID: 0}
+  bossIcon: {fileID: 0}
+  giftIcon: {fileID: 0}
+  playIcon: {fileID: 0}
+  pauseIcon: {fileID: 0}

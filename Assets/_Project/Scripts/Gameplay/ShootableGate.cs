@@ -5,19 +5,18 @@ namespace RecruitRush
     /// <summary>
     /// Gate rolling down a side corridor. Every bullet raises its value (-5 → +1 → +20...).
     /// When it reaches the squad's line, a squad standing under it gains (or loses) that many soldiers.
+    /// Looks: a bright rounded arch. Minus = red with a pulsing contour ("shoot me up"), plus = green; flipping to
+    /// plus flashes the contour and pops the arch.
     /// </summary>
     public class ShootableGate : Target
     {
-        static readonly Color Good = new(0.2f, 0.55f, 1f);
-        static readonly Color Bad = new(0.95f, 0.25f, 0.2f);
-        static readonly Color Post = new(0.3f, 0.32f, 0.3f);
+        const float ArchHeight = 3.1f;
 
         float value, growthStep, cap;
         PlayerSquad squad;
         TMPro.TextMeshPro label;
-        MeshRenderer panel;
-        Transform panelT;
-        float punch;
+        ArchKit.Arch arch;
+        float punch, hitGlow;
         bool done;
 
         public int Value => Mathf.FloorToInt(value);
@@ -36,12 +35,8 @@ namespace RecruitRush
             g.depth = 0.1f;
             g.hitHeight = 1.3f;
 
-            foreach (int s in new[] { -1, 1 })
-                Art.Box("Post", go.transform, new Vector3(s * width * 0.5f, 1.3f, 0f), new Vector3(0.25f, 2.6f, 0.25f), Art.Lit(Post));
-            Art.Box("Beam", go.transform, new Vector3(0f, 2.65f, 0f), new Vector3(width + 0.25f, 0.2f, 0.28f), Art.Lit(Post));
-            g.panelT = Art.Box("Panel", go.transform, new Vector3(0f, 1.3f, 0f), new Vector3(width - 0.3f, 2.3f, 0.08f), Art.Lit(Good), null, false).transform;
-            g.panel = g.panelT.GetComponent<MeshRenderer>();
-            g.label = Art.Text("Value", go.transform, new Vector3(0f, 1.35f, -0.1f), "", 1f, Color.white);
+            g.arch = ArchKit.Build(go.transform, width, ArchHeight, startValue >= 0 ? ArchStatus.Positive : ArchStatus.Negative);
+            g.label = Art.Text("Value", go.transform, new Vector3(0f, 1.45f, -0.25f), "", 1.05f, Color.white);
             g.label.transform.localRotation = Quaternion.Euler(35f, 0f, 0f);
             g.Refresh();
             return g;
@@ -51,7 +46,12 @@ namespace RecruitRush
         {
             int v = Value;
             label.text = v >= 0 ? "+" + v : v.ToString();
-            panel.sharedMaterial = Art.Lit(v >= 0 ? Good : Bad);
+            var status = v >= 0 ? ArchStatus.Positive : ArchStatus.Negative;
+            if (status != arch.status)
+            {
+                arch.SetStatus(status);
+                if (status == ArchStatus.Positive) punch = 2f; // turned good: bigger pop
+            }
         }
 
         public override void TakeHit(float damage)
@@ -59,7 +59,8 @@ namespace RecruitRush
             if (done) return;
             int before = Value;
             value = Mathf.Min(cap, value + damage / growthStep);
-            punch = 1f;
+            punch = Mathf.Max(punch, 1f);
+            hitGlow = 0.35f;
             if (Value != before) Refresh();
         }
 
@@ -73,8 +74,11 @@ namespace RecruitRush
             if (punch > 0f)
             {
                 punch = Mathf.MoveTowards(punch, 0f, Time.deltaTime * 6f);
-                panelT.localScale = new Vector3(panelT.localScale.x, 2.3f * (1f + punch * 0.05f), 0.08f);
+                float s = 1f + Mathf.Min(punch, 2f) * 0.03f;
+                arch.root.localScale = new Vector3(s, s, 1f);
             }
+            hitGlow = Mathf.MoveTowards(hitGlow, 0f, Time.deltaTime * 4f);
+            arch.Tick(Time.deltaTime, hitGlow);
 
             Vector3 sp = squad.transform.position;
             if (p.z > sp.z) return;

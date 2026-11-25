@@ -11,7 +11,13 @@ namespace RecruitRush
             public Transform root;
             public Transform gun;
             public float phase;
+            /// <summary>Still running in from <see cref="SpawnFrom"/> (moves at running speed, not snapped to its slot).</summary>
+            public bool runIn;
         }
+
+        /// <summary>When set, newly spawned soldiers start here and run to their slot (lobby squad purchase).</summary>
+        public Vector3? SpawnFrom { get; set; }
+        const float RunInSpeed = 8.5f;
 
         public float baseSpacing = 0.42f;
         public int maxVisible = 200;
@@ -38,8 +44,9 @@ namespace RecruitRush
         public event System.Action StatsChanged;
 
         readonly List<Unit> units = new();
-        Transform unitsRoot, badge;
-        TMPro.TextMeshPro badgeText;
+        Transform unitsRoot;
+        /// <summary>Parent of the soldier models (a sibling of the squad, so the crowd isn't dragged by its transform).</summary>
+        public Transform UnitsRoot => unitsRoot;
         Tracers tracers;
         float targetX, shotAcc, commanderAcc;
 
@@ -52,12 +59,6 @@ namespace RecruitRush
             unitsRoot = new GameObject("PlayerUnits").transform;
             unitsRoot.SetParent(transform.parent, false);
 
-            badge = new GameObject("Badge").transform;
-            badge.SetParent(transform, false);
-            badge.gameObject.AddComponent<Billboard>();
-            // The squad size is the number the player cares about most: big, bold, outlined, no box.
-            badgeText = Art.Text("BadgeText", badge, Vector3.zero, "0", 1.1f, Color.white);
-
             SetCount(count, transform.position);
         }
 
@@ -68,13 +69,10 @@ namespace RecruitRush
         public void SetCount(int n, Vector3 hitFrom)
         {
             n = Mathf.Max(0, n);
-            bool grew = n > Count;
             Count = n;
             int want = Mathf.Min(n, maxVisible);
             while (units.Count < want) SpawnUnit();
             while (units.Count > want) KillUnit(units.Count - 1, hitFrom);
-            if (badgeText) badgeText.text = n.ToString();
-            if (badge && grew) Pop.Play(badge, 1.2f);
             CountChanged?.Invoke(n);
         }
 
@@ -89,6 +87,14 @@ namespace RecruitRush
                 float commander = Weapons.FireRate * CommanderRateMul * FireRateMul * perBullet * CommanderDamageMul;
                 return soldiers + commander;
             }
+        }
+
+        /// <summary>Permanent (meta) multipliers, applied before the run starts.</summary>
+        public void SetBaseMultipliers(float damage, float fireRate)
+        {
+            DamageMul = damage;
+            FireRateMul = fireRate;
+            StatsChanged?.Invoke();
         }
 
         public void AddDamage(float amount)
@@ -148,8 +154,11 @@ namespace RecruitRush
                     Art.Box("Beret", root, new Vector3(0f, 0.9f, 0f), new Vector3(0.28f, 0.08f, 0.28f), Art.Lit(CommanderHelmet), Prims.Cylinder, false);
                 }
             }
-            root.position = transform.position + Formation.Slot(units.Count, Spacing) * 0.3f;
-            var u = new Unit { root = root, gun = gun, phase = Random.value * 10f };
+            bool runIn = SpawnFrom.HasValue;
+            root.position = runIn
+                ? SpawnFrom.Value + new Vector3(Random.Range(-1.5f, 1.5f), 0f, Random.Range(-1f, 1f))
+                : transform.position + Formation.Slot(units.Count, Spacing) * 0.3f;
+            var u = new Unit { root = root, gun = gun, phase = Random.value * 10f, runIn = runIn };
             ApplyGun(u);
             units.Add(u);
             Pop.Play(root, 0f);
@@ -190,12 +199,22 @@ namespace RecruitRush
                 Vector3 target = p + Formation.Slot(i, spacing);
                 Vector3 cur = u.root.position;
                 cur.y = 0f;
-                Vector3 np = Vector3.Lerp(cur, target, follow);
-                float bob = running && !u.gun ? 0f : running ? Mathf.Abs(Mathf.Sin(time * 13f + u.phase)) * 0.08f : 0f;
+                Vector3 np;
+                float bob;
+                if (u.runIn)
+                {
+                    np = Vector3.MoveTowards(cur, target, RunInSpeed * dt);
+                    bob = Mathf.Abs(Mathf.Sin(time * 14f + u.phase)) * 0.12f; // running hop
+                    if ((np - target).sqrMagnitude < 0.04f) u.runIn = false;
+                }
+                else
+                {
+                    np = Vector3.Lerp(cur, target, follow);
+                    bob = running && !u.gun ? 0f : running ? Mathf.Abs(Mathf.Sin(time * 13f + u.phase)) * 0.08f : 0f;
+                }
                 u.root.SetPositionAndRotation(new Vector3(np.x, bob, np.z), Quaternion.identity);
             }
 
-            if (badge) badge.localPosition = new Vector3(0f, 1.5f + Radius * 0.15f, 0f);
             if (Firing) Shoot(dt);
         }
 
@@ -211,7 +230,7 @@ namespace RecruitRush
             while (commanderAcc >= 1f)
             {
                 commanderAcc -= 1f;
-                FireOne(units[0].root.TransformPoint(muzzleLocal), baseDamage * CommanderDamageMul, color, true);
+                FireOne(units[0].root.TransformPoint(muzzleLocal), baseDamage * CommanderDamageMul, color, true, true);
             }
 
             // Rank and file (the commander is not counted twice).
@@ -232,7 +251,7 @@ namespace RecruitRush
             }
         }
 
-        void FireOne(Vector3 muzzle, float damage, Color color, bool flash)
+        void FireOne(Vector3 muzzle, float damage, Color color, bool flash, bool heavy = false)
         {
             if (flash) Fx.Muzzle(muzzle, color);
             var target = Target.FindInSector(muzzle.x, muzzle.z, range, AimSector);
@@ -243,6 +262,7 @@ namespace RecruitRush
                 float tx = Mathf.Clamp(muzzle.x, target.transform.position.x - target.halfWidth, target.transform.position.x + target.halfWidth);
                 end = new Vector3(tx, target.hitHeight, target.FrontZ);
                 target.TakeHit(damage);
+                WorldText.Damage(target, damage, heavy);
             }
             else end = muzzle + Vector3.forward * range;
             tracers.Fire(muzzle, end, color);

@@ -10,7 +10,8 @@ namespace RecruitRush
         public enum State { Ready, Playing, Win, Lose }
 
         const string LevelKey = "rr_level";
-        const string CoinsKey = "rr_coins";
+        /// <summary>One coin drops for every N kills during a run (banked immediately).</summary>
+        const int KillsPerCoin = 2;
 
         public GameAssets assets;
         [Tooltip("Road widths moved per full-screen-width drag.")]
@@ -32,7 +33,7 @@ namespace RecruitRush
         public Tracers Tracers { get; private set; }
         public float WorldSpeed => Current == State.Playing ? conveyorSpeed : 0f;
 
-        int coins, lastCount;
+        int lastCount, runCoins;
 
         void Awake()
         {
@@ -44,7 +45,6 @@ namespace RecruitRush
             Sfx.Init();
             Level = Mathf.Max(1, PlayerPrefs.GetInt(LevelKey, 1));
             if (int.TryParse(CommandLine.Value("-level"), out int forced)) Level = Mathf.Max(1, forced);
-            coins = PlayerPrefs.GetInt(CoinsKey, 0);
         }
 
         void OnDestroy()
@@ -55,6 +55,7 @@ namespace RecruitRush
         void Start()
         {
             Config = LevelConfig.For(Level);
+            SceneLook.ApplyRuntime();
             var world = new GameObject("World").transform;
             WorldBuilder.Build(world, new System.Random(Level * 7919 + 1));
 
@@ -64,7 +65,8 @@ namespace RecruitRush
             squadGo.transform.SetParent(field, false);
             Squad = squadGo.AddComponent<PlayerSquad>();
             Squad.roadHalfWidth = WorldBuilder.HalfWidth;
-            Squad.Init(Config.startCount, Tracers);
+            Squad.Init(StartCount, Tracers);
+            Squad.SetBaseMultipliers(MetaProgress.DamageMul, MetaProgress.RateMul);
             Squad.CountChanged += OnSquadCount;
             Director = LevelDirector.Create(field, Config, Squad);
 
@@ -72,13 +74,15 @@ namespace RecruitRush
             Cam = cam.GetComponent<CameraFollow>();
             if (!Cam) Cam = cam.gameObject.AddComponent<CameraFollow>();
             Cam.squad = Squad;
+            Cam.SetLobby(true); // start screen frames the squad close-up
             Cam.Snap();
 
             UI = GameUI.Create();
             UI.SetLevel(Level);
-            UI.SetCoins(coins);
+            UI.SetCoins(MetaProgress.Coins);
             UI.SetStats(Squad);
-            UI.ShowStart(Level);
+            UI.AttachSquad(Squad);
+            UI.ShowLobby(Level, Begin, BuyUpgrade);
             Squad.StatsChanged += () => UI.SetStats(Squad);
 
             Debug.Log($"[LEVEL] {Level}: duration={Config.duration}s segments={Config.segments.Count} cap={Config.activeCap} turrets={Config.turretTimes.Length} bossHp={Config.bossHp}");
@@ -90,8 +94,7 @@ namespace RecruitRush
             switch (Current)
             {
                 case State.Ready:
-                    if (SwipeInput.PressedThisFrame && !SwipeInput.OverUI) Begin();
-                    break;
+                    break; // the lobby's PLAY button starts the run
                 case State.Playing:
                     if (UI.Paused) break;
                     if (SwipeInput.Pressed)
@@ -106,20 +109,45 @@ namespace RecruitRush
             if (Current != State.Ready) return;
             Current = State.Playing;
             Squad.Firing = true;
-            UI.HideStart();
+            UI.HideLobby();
+            Cam.BlendToGame(); // starts together with the lobby UI exit so both land at once
         }
 
-        public void OnEnemyKilled() => Kills++;
+        int StartCount => Config.startCount + MetaProgress.BonusSoldiers;
+
+        /// <summary>Lobby purchase: spend coins and apply the upgrade to the waiting squad right away.</summary>
+        bool BuyUpgrade(MetaUpgrade u)
+        {
+            if (Current != State.Ready || !MetaProgress.TryBuy(u)) return false;
+            Debug.Log($"[META] bought {u} -> Lv.{MetaProgress.Level(u)}, coins={MetaProgress.Coins}");
+            if (u == MetaUpgrade.Squad)
+            {
+                // New recruits run in from the camera side instead of popping up inside the crowd.
+                Squad.SpawnFrom = Squad.transform.position + new Vector3(0f, 0f, -7f);
+                Squad.SetCount(StartCount, Squad.transform.position);
+                Squad.SpawnFrom = null;
+            }
+            else Squad.SetBaseMultipliers(MetaProgress.DamageMul, MetaProgress.RateMul);
+            UI.SetCoins(MetaProgress.Coins, false);
+            return true;
+        }
+
+        public void OnEnemyKilled()
+        {
+            Kills++;
+            if (Current != State.Playing || Kills % KillsPerCoin != 0) return;
+            runCoins++;
+            MetaProgress.Coins += 1;
+            UI.SetCoins(MetaProgress.Coins, false);
+        }
 
         public void ApplyUpgrade(UpgradeType type, int amount = 0)
         {
             if (Current != State.Playing) return;
             if (type == UpgradeType.Soldiers) Squad.Add(amount);
             else Squad.Upgrade(type);
-            string text = type == UpgradeType.Weapon ? Weapons.Names[Squad.Tier] : Upgrades.Label(type, amount);
             Debug.Log($"[UPGRADE] {type} -> {Weapons.Names[Squad.Tier]} rate x{Squad.FireRateMul:0.00} dmg x{Squad.DamageMul:0.00}");
-            FloatingText.Spawn(Squad.transform, new Vector3(0f, 2.8f, 0f), text, Upgrades.Color(type));
-            UI.ShowBanner(text, Upgrades.Color(type));
+            UI.OnUpgrade(Squad, type, amount);
             Fx.Sparks(Squad.transform.position + Vector3.up, Upgrades.Color(type), 20);
             Sfx.Upgrade();
             Haptics.Medium();
@@ -130,8 +158,7 @@ namespace RecruitRush
         {
             if (Current != State.Playing || value == 0) return;
             Squad.SetCount(Squad.Count + value, at);
-            Color c = value > 0 ? new Color(0.55f, 0.85f, 1f) : new Color(1f, 0.4f, 0.35f);
-            FloatingText.Spawn(Squad.transform, new Vector3(0f, 2.8f, 0f), (value > 0 ? "+" : "") + value, c);
+            UI.OnGate(Squad, value);
             if (value > 0) Sfx.Upgrade(); else Sfx.Boom(0.8f);
             Haptics.Medium();
             Debug.Log($"[GATE] {value:+0;-0} -> squad={Squad.Count}");
@@ -143,7 +170,7 @@ namespace RecruitRush
         public void OnFinalWave()
         {
             Debug.Log($"[WAVE] final wave, squad={Squad.Count}");
-            UI.ShowBanner("FINAL WAVE!", new Color(1f, 0.45f, 0.35f));
+            UI.ShowBanner("FINAL WAVE!", UiTheme.Current.red);
         }
 
         public void OnBossSpawned(Boss boss)
@@ -151,7 +178,7 @@ namespace RecruitRush
             Boss = boss;
             Boss.Died += OnBossDied;
             Debug.Log($"[BOSS] spawned hp={boss.MaxHp}, squad={Squad.Count} {Weapons.Names[Squad.Tier]} rate x{Squad.FireRateMul:0.00} dmg x{Squad.DamageMul:0.00}");
-            UI.ShowBanner("BOSS INCOMING!", new Color(1f, 0.3f, 0.25f));
+            UI.ShowBanner("BOSS INCOMING!", UiTheme.Current.red);
         }
 
         void OnBossDied()
@@ -163,15 +190,24 @@ namespace RecruitRush
             Sfx.Boom(3f);
             Haptics.Heavy();
             StartCoroutine(SlowMotion());
-            int reward = 20 + Level * 5 + Squad.Count + Kills / 2;
-            int before = coins;
-            coins += reward;
-            PlayerPrefs.SetInt(CoinsKey, coins);
+            // Kill coins were already banked during the run; bank the level reward and chest now so they survive a quit.
+            int reward = 20 + Level * 5 + Squad.Count;
+            int chest = MetaProgress.ChestAt(Level) ? MetaProgress.ChestCoins(Level) : 0;
+            int before = MetaProgress.Coins;
+            MetaProgress.Coins = before + reward + chest;
             PlayerPrefs.SetInt(LevelKey, Level + 1);
             PlayerPrefs.Save();
-            StartCoroutine(ShowResult(new ResultInfo
+            var info = new ResultInfo
             {
-                win = true, level = Level, survivors = Squad.Count, kills = Kills, reward = reward, coinsBefore = before
+                win = true, level = Level, survivors = Squad.Count, kills = Kills, reward = reward, chest = chest,
+                runCoins = runCoins, coinsBefore = before,
+                trackFrom = MetaProgress.TrackBefore(Level), trackTo = MetaProgress.TrackAfter(Level)
+            };
+            StartCoroutine(ShowResult(info, mult =>
+            {
+                if (mult <= 1) return;
+                MetaProgress.Coins += reward * (mult - 1);
+                PlayerPrefs.Save();
             }));
         }
 
@@ -203,17 +239,18 @@ namespace RecruitRush
             if (count > 0 || Current != State.Playing) return;
             Current = State.Lose;
             Squad.Firing = false;
+            PlayerPrefs.Save();
             StartCoroutine(ShowResult(new ResultInfo
             {
-                win = false, level = Level, survivors = 0, kills = Kills, reward = 0, coinsBefore = coins,
-                tip = Tips[Random.Range(0, Tips.Length)]
-            }));
+                win = false, level = Level, survivors = 0, kills = Kills, reward = 0, runCoins = runCoins,
+                coinsBefore = MetaProgress.Coins, tip = Tips[Random.Range(0, Tips.Length)]
+            }, null));
         }
 
-        IEnumerator ShowResult(ResultInfo info)
+        IEnumerator ShowResult(ResultInfo info, System.Action<int> onCollect)
         {
             yield return new WaitForSeconds(1.3f);
-            UI.ShowResult(info, Reload);
+            UI.ShowResult(info, onCollect, Reload);
         }
 
         public void Reload() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);

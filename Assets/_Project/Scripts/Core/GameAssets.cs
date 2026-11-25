@@ -17,6 +17,8 @@ namespace RecruitRush
         public TMPro.TMP_FontAsset font;
         [Tooltip("Font material with a dark outline, so numbers read over any background.")]
         public Material fontOutline;
+        [Tooltip("HUD font material: outline + hard drop shadow (OUTLINE_ON + UNDERLAY_ON kept on an asset so the variant ships).")]
+        public Material fontHud;
 
         [Header("Unit models (optional: falls back to primitives when empty)")]
         public GameObject playerSoldier;

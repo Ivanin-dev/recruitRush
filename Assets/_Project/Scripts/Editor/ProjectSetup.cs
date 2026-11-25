@@ -18,7 +18,7 @@ namespace RecruitRush.EditorTools
     {
         const string Root = "Assets/_Project";
         const string ScenePath = Root + "/Scenes/Game.unity";
-        static readonly Color Sky = new(0.64f, 0.79f, 0.93f);
+        static Color Sky => SceneLook.Sky;
 
         [MenuItem("Recruit Rush/Rebuild Game Scene")]
         public static void BuildScene()
@@ -70,15 +70,9 @@ namespace RecruitRush.EditorTools
 
             RenderSettings.skybox = null;
             RenderSettings.sun = sun;
-            RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.78f, 0.84f, 0.95f);
-            RenderSettings.ambientEquatorColor = new Color(0.72f, 0.7f, 0.64f);
-            RenderSettings.ambientGroundColor = new Color(0.45f, 0.4f, 0.33f);
-            RenderSettings.fog = true;
-            RenderSettings.fogMode = FogMode.Linear;
-            RenderSettings.fogColor = Sky;
-            RenderSettings.fogStartDistance = 45f;
-            RenderSettings.fogEndDistance = 120f;
+            // Sky, sun, ambient, fog and grading come from SceneLook (also re-applied at runtime).
+            SceneLook.Apply(cam, sun, profile);
+            EditorUtility.SetDirty(profile);
 
             new GameObject("Game").AddComponent<GameManager>().assets = assets;
 
@@ -179,7 +173,53 @@ namespace RecruitRush.EditorTools
             mat.SetFloat("_FaceDilate", 0.15f);
             EditorUtility.SetDirty(mat);
             assets.fontOutline = mat;
+
+            // HUD text: outline + hard drop shadow. Saved as an asset so the UNDERLAY_ON variant isn't stripped from builds.
+            const string hudPath = Root + "/Materials/M_TextHud.mat";
+            var hud = AssetDatabase.LoadAssetAtPath<Material>(hudPath);
+            if (!hud)
+            {
+                hud = new Material(font.material);
+                AssetDatabase.CreateAsset(hud, hudPath);
+            }
+            var theme = SetupUiTheme();
+            hud.EnableKeyword("OUTLINE_ON");
+            hud.EnableKeyword("UNDERLAY_ON");
+            hud.SetFloat("_OutlineWidth", theme.outlineWidth);
+            hud.SetColor("_OutlineColor", theme.edge);
+            hud.SetFloat("_FaceDilate", theme.faceDilate);
+            hud.SetColor("_UnderlayColor", theme.edge);
+            hud.SetFloat("_UnderlayOffsetX", theme.shadowOffset.x);
+            hud.SetFloat("_UnderlayOffsetY", theme.shadowOffset.y);
+            hud.SetFloat("_UnderlayDilate", theme.shadowDilate);
+            hud.SetFloat("_UnderlaySoftness", 0f);
+            EditorUtility.SetDirty(hud);
+            assets.fontHud = hud;
         }
+
+        /// <summary>Creates Resources/UiTheme.asset (all UI colors, sizes, timings) if it doesn't exist yet.</summary>
+        [MenuItem("Recruit Rush/Create UI Theme")]
+        public static UiTheme SetupUiTheme()
+        {
+            const string path = Root + "/Resources/UiTheme.asset";
+            EnsureFolder(Root + "/Resources");
+            var theme = AssetDatabase.LoadAssetAtPath<UiTheme>(path);
+            if (theme) return theme;
+            theme = ScriptableObject.CreateInstance<UiTheme>();
+            AssetDatabase.CreateAsset(theme, path);
+            AssetDatabase.SaveAssets();
+            return theme;
+        }
+
+        /// <summary>Batch: creates/updates the UI theme and HUD font material without rebuilding the scene.</summary>
+        public static void SetupUiBatch() => RunBatch(() =>
+        {
+            var assets = AssetDatabase.LoadAssetAtPath<GameAssets>(Root + "/Data/GameAssets.asset");
+            if (!assets) throw new Exception("GameAssets.asset missing: run Rebuild Game Scene first");
+            SetupText(assets);
+            EditorUtility.SetDirty(assets);
+            AssetDatabase.SaveAssets();
+        });
 
         const string ToonyRoot = "Assets/ToonyTinyPeople/TT_ww1_demo";
 
@@ -339,7 +379,8 @@ namespace RecruitRush.EditorTools
             if (EditorUserBuildSettings.activeBuildTarget != BuildTarget.Android)
                 EditorUserBuildSettings.SwitchActiveBuildTarget(BuildTargetGroup.Android, BuildTarget.Android);
 
-            var options = BuildOptions.AutoRunPlayer;
+            // -noinstall: just produce the APK (no phone connected); otherwise install + launch on the USB device.
+            var options = Environment.GetCommandLineArgs().Contains("-noinstall") ? BuildOptions.None : BuildOptions.AutoRunPlayer;
             if (Environment.GetCommandLineArgs().Contains("-devbuild")) options |= BuildOptions.Development;
             var report = BuildPipeline.BuildPlayer(new BuildPlayerOptions
             {

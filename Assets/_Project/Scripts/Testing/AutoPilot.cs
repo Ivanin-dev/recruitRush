@@ -20,6 +20,12 @@ namespace RecruitRush
             dir = CommandLine.Value("-shotdir") ?? Application.persistentDataPath;
             Directory.CreateDirectory(dir);
             Debug.Log($"[AUTO] level {gm.Level}, screenshots -> {dir}");
+            if (int.TryParse(CommandLine.Value("-coins"), out int c))
+            {
+                MetaProgress.Coins = c;
+                gm.UI.SetCoins(c);
+                gm.UI.RefreshLobby();
+            }
         }
 
         void Update()
@@ -51,8 +57,8 @@ namespace RecruitRush
                     string boss = gm.Boss ? $"{gm.Boss.Hp:0}/{gm.Boss.MaxHp:0}" : "not reached";
                     Debug.Log($"[AUTO] RESULT {gm.Current} squad={gm.Squad.Count} kills={gm.Kills} boss={boss} time={t:0.0}s");
                 }
-                if (!shotEnd && t - endT > 2f) { shotEnd = true; Shot("5_result"); }
-                if (t - endT > 3f) Application.Quit();
+                if (!shotEnd && t - endT > 3.6f) { shotEnd = true; Shot("5_result"); }
+                if (t - endT > 4.5f) Application.Quit();
             }
 
             if (t > 180f)

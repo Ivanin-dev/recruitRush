@@ -3,12 +3,12 @@ using UnityEngine;
 
 namespace RecruitRush
 {
-    /// <summary>Left lane: a "+1" box that joins the squad on contact.</summary>
+    /// <summary>
+    /// Left lane: a "+1" recruit that joins the squad on contact. Looks: a small blue (own squad) arch over a glowing
+    /// pad; bigger bundles are gold (bonus).
+    /// </summary>
     public class Pickup : MonoBehaviour
     {
-        static readonly Color BoxColor = new(0.2f, 0.5f, 1f);
-        static readonly Color FrameColor = new(0.85f, 0.92f, 1f);
-
         int value;
         PlayerSquad squad;
         bool taken;
@@ -22,10 +22,13 @@ namespace RecruitRush
             p.value = value;
             p.squad = squad;
             bool big = value > 1;
-            Art.Box("Frame", go.transform, new Vector3(0f, 0.4f, 0f), new Vector3(1.55f, 0.8f, 0.95f), Art.Lit(FrameColor));
-            Art.Box("Box", go.transform, new Vector3(0f, 0.45f, 0f), new Vector3(1.4f, 0.82f, 0.85f),
-                big ? Art.Glow(new Color(1f, 0.7f, 0.15f)) : Art.Lit(BoxColor), null, false);
-            var label = Art.Text("Label", go.transform, new Vector3(0f, 0.9f, -0.05f), "+" + value, 0.55f, Color.white);
+            var status = big ? ArchStatus.Bonus : ArchStatus.Squad;
+            Color c = ArchKit.Role(status);
+            // Glowing pad on the ground + a small arch with a translucent fill.
+            Art.Box("Pad", go.transform, new Vector3(0f, 0.03f, 0f), new Vector3(1.9f, 0.03f, 1.9f), Art.Emissive(c, 1.3f), Prims.Cylinder, false);
+            Art.Box("PadRim", go.transform, new Vector3(0f, 0.02f, 0f), new Vector3(2.15f, 0.02f, 2.15f), Art.Lit(ArchKit.PillarColor), Prims.Cylinder, false);
+            ArchKit.Build(go.transform, 1.5f, 1.6f, status, true, 0.2f, 0.22f);
+            var label = Art.Text("Label", go.transform, new Vector3(0f, 0.85f, -0.2f), "+" + value, 0.6f, Color.white);
             label.transform.localRotation = Quaternion.Euler(55f, 0f, 0f);
             return p;
         }
@@ -268,10 +271,13 @@ namespace RecruitRush
     /// <summary>
     /// Right lane: a sturdy crate. Shoot it down before it reaches the squad: mostly big "+N soldiers",
     /// sometimes a weapon / fire-rate / damage upgrade.
+    /// Looks: a target block in its role color (blue = soldiers, green = buff) in a light frame, with a glowing top
+    /// edge that flares on every hit ("keep shooting") and the HP on a deep indigo plate.
     /// </summary>
     public class UpgradeCrate : Target
     {
-        static readonly Color Wood = new(0.45f, 0.33f, 0.2f);
+        static readonly Color Frame = ArchKit.PillarColor;
+        static readonly int EmissionId = Shader.PropertyToID("_EmissionColor");
 
         UpgradeType type;
         int amount;
@@ -279,6 +285,9 @@ namespace RecruitRush
         PlayerSquad squad;
         TMPro.TextMeshPro hpText;
         Transform body;
+        MeshRenderer glowEdge;
+        MaterialPropertyBlock mpb;
+        Color glowColor;
         float punch;
 
         public static UpgradeCrate Spawn(Transform parent, Vector3 pos, UpgradeType type, float hp, PlayerSquad squad, int amount = 0)
@@ -300,12 +309,22 @@ namespace RecruitRush
             Color col = Upgrades.Color(type);
             Art.Box("Crate", c.body, new Vector3(0f, 0.62f, 0f), new Vector3(2.2f, 1.25f, 1.2f), Art.Lit(col));
             foreach (int s in new[] { -1, 1 })
-                Art.Box("Frame", c.body, new Vector3(s * 1.06f, 0.62f, -0.02f), new Vector3(0.16f, 1.32f, 1.26f), Art.Lit(Wood), null, false);
-            Art.Box("FrameTop", c.body, new Vector3(0f, 1.25f, -0.02f), new Vector3(2.28f, 0.14f, 1.26f), Art.Lit(Wood), null, false);
+                Art.Box("Frame", c.body, new Vector3(s * 1.08f, 0.64f, -0.02f), new Vector3(0.18f, 1.32f, 1.28f), Art.Lit(Frame), null, false);
+            Art.Box("Base", c.body, new Vector3(0f, 0.06f, -0.02f), new Vector3(2.36f, 0.14f, 1.3f), Art.Lit(Frame), null, false);
+            c.glowColor = Color.Lerp(col, Color.white, 0.3f);
+            c.glowEdge = Art.Box("GlowEdge", c.body, new Vector3(0f, 1.3f, -0.02f), new Vector3(2.34f, 0.12f, 1.3f),
+                Art.Emissive(c.glowColor, 1.4f), null, false).GetComponent<MeshRenderer>();
 
             // Soldier crates advertise the reward on the face and the HP above; upgrades the other way round.
             bool soldiers = type == UpgradeType.Soldiers;
-            var face = Art.Text("Face", c.body, new Vector3(0f, 0.95f, -0.3f),
+            if (!soldiers)
+            {
+                // HP plate: deep indigo, so the white number reads on any role color.
+                var plate = Art.Box("HpPlate", c.body, new Vector3(0f, 0.8f, -0.8f), new Vector3(1.25f, 0.62f, 0.05f),
+                    Art.Lit(UiTheme.Current.slateFace), null, false);
+                plate.transform.localRotation = Quaternion.Euler(50f, 0f, 0f);
+            }
+            var face = Art.Text("Face", c.body, soldiers ? new Vector3(0f, 0.95f, -0.3f) : new Vector3(0f, 0.8f, -0.86f),
                 soldiers ? Upgrades.Label(type, amount) : Mathf.CeilToInt(hp).ToString(), 0.62f, Color.white);
             face.transform.localRotation = Quaternion.Euler(50f, 0f, 0f);
             var top = Art.Text("Top", go.transform, new Vector3(0f, 1.85f, 0f),
@@ -324,8 +343,15 @@ namespace RecruitRush
             p.z -= gm.LaneSpeed(p.x) * 0.65f * Time.deltaTime; // heavy: slower than the conveyor, more time to shoot
             transform.position = p;
 
-            punch = Mathf.MoveTowards(punch, 0f, Time.deltaTime * 6f);
-            body.localScale = Vector3.one * (1f + punch * 0.08f);
+            if (punch > 0f)
+            {
+                punch = Mathf.MoveTowards(punch, 0f, Time.deltaTime * 6f);
+                body.localScale = Vector3.one * (1f + punch * 0.08f);
+                // Hit flare on the glowing edge.
+                mpb ??= new MaterialPropertyBlock();
+                mpb.SetColor(EmissionId, glowColor * (1.4f + punch * 2.6f));
+                glowEdge.SetPropertyBlock(mpb);
+            }
 
             if (p.z - depth < squad.transform.position.z + 0.5f)
             {
@@ -346,7 +372,7 @@ namespace RecruitRush
             if (hp > 0f)
             {
                 if (Random.value < 0.3f)
-                    Fx.Sparks(transform.position + new Vector3(Random.Range(-1f, 1f), Random.Range(0.4f, 1.5f), -depth), Wood, 2);
+                    Fx.Sparks(transform.position + new Vector3(Random.Range(-1f, 1f), Random.Range(0.4f, 1.5f), -depth), glowColor, 2);
                 return;
             }
             Alive = false;

@@ -48,13 +48,8 @@ namespace RecruitRush
             _ => "DAMAGE +30%"
         };
 
-        public static Color Color(UpgradeType t) => t switch
-        {
-            UpgradeType.Soldiers => new Color(1f, 0.74f, 0.15f),
-            UpgradeType.Weapon => new Color(0.95f, 0.45f, 0.15f),
-            UpgradeType.FireRate => new Color(0.2f, 0.75f, 0.85f),
-            _ => new Color(0.85f, 0.35f, 0.85f)
-        };
+        /// <summary>Color role of an upgrade: soldiers are "own squad" (blue), every buff is "positive" (green).</summary>
+        public static Color Color(UpgradeType t) => t == UpgradeType.Soldiers ? UiTheme.Current.blue : UiTheme.Current.green;
     }
 
     /// <summary>Sunflower (Vogel) packing: dense, round crowd for any count.</summary>

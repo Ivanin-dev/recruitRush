@@ -195,7 +195,7 @@ namespace RecruitRush
                     : s.mix is WaveMix.Combo or WaveMix.SwarmHeavy ? LevelPhase.Climax : LevelPhase.Pressure;
                 if (s.kind is SegmentKind.Wave or SegmentKind.FinalWave) StartWave(s);
                 if (s.kind == SegmentKind.FinalWave) gm.OnFinalWave();
-                if (s.mix == WaveMix.Combo && s.kind == SegmentKind.Wave) gm.UI.ShowBanner("ELITES INCOMING!", new Color(1f, 0.6f, 0.2f));
+                if (s.mix == WaveMix.Combo && s.kind == SegmentKind.Wave) gm.UI.ShowBanner("ELITES INCOMING!", UiTheme.Current.red);
                 Debug.Log($"[SEG] {s.kind} {s.mix} at t={t:0.0}s squad={squad.Count} dps={squad.Dps:0}");
             }
         }

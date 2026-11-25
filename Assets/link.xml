@@ -1,0 +1,4 @@
+<linker>
+  <!-- Prims.Grab uses GameObject.CreatePrimitive, which adds colliders; keep them so IL2CPP stripping doesn't log errors. -->
+  <assembly fullname="UnityEngine.PhysicsModule" preserve="all"/>
+</linker>

@@ -45,17 +45,36 @@ namespace RecruitRush
         public static Material Lit(Color c) => Get(c, 0);
         public static Material Glow(Color c) => Get(c, 1);
 
+        /// <summary>Glow with a chosen HDR strength (1 = just at the bloom threshold, 3 = <see cref="Glow"/>).</summary>
+        public static Material Emissive(Color c, float intensity) => Get(c, 2 + Mathf.Clamp(Mathf.RoundToInt(intensity * 10f), 0, 90));
+
+        /// <summary>Unlit alpha-blended tint (gate panels). Uses the transparent particle template so its variant ships.</summary>
+        public static Material Translucent(Color c) => Get(c, TranslucentKind);
+
+        const int TranslucentKind = 100;
+
         static Material Get(Color c, int kind)
         {
             Color32 k = c;
             long key = ((long)kind << 32) | ((long)k.r << 24) | ((long)k.g << 16) | ((long)k.b << 8) | k.a;
             if (Cache.TryGetValue(key, out var m) && m) return m;
 
-            Material template = assets ? (kind == 1 ? assets.glow : assets.lit) : null;
+            if (kind == TranslucentKind)
+            {
+                var t = assets ? assets.fxSmoke : null;
+                if (!t) return Get(new Color(c.r, c.g, c.b, 1f), 0); // no transparent template: fall back to opaque
+                m = new Material(t) { name = "Translucent (runtime)" };
+                m.SetColor(BaseColorId, c);
+                Cache[key] = m;
+                return m;
+            }
+
+            Material template = assets ? (kind >= 1 ? assets.glow : assets.lit) : null;
             m = template ? new Material(template) : new Material(Shader.Find("Universal Render Pipeline/Lit"));
             m.enableInstancing = true;
             m.SetColor(BaseColorId, c);
             if (kind == 1) m.SetColor(EmissionId, c * 3f);
+            else if (kind >= 2) m.SetColor(EmissionId, c * ((kind - 2) / 10f));
             Cache[key] = m;
             return m;
         }

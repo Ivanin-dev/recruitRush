@@ -2,12 +2,15 @@
 
 namespace RecruitRush
 {
-    /// <summary>Wooden barricade closing a side corridor. While it stands, that corridor's conveyor is frozen.</summary>
+    /// <summary>
+    /// Barricade closing a side corridor. While it stands, that corridor's conveyor is frozen.
+    /// Looks: danger = red/white hazard planks between light posts, HP on a deep indigo plate.
+    /// </summary>
     public class Barricade : Target
     {
-        static readonly Color Wood = new(0.55f, 0.4f, 0.24f);
-        static readonly Color WoodDark = new(0.38f, 0.27f, 0.16f);
-        static readonly Color Steel = new(0.4f, 0.42f, 0.42f);
+        static Color Wood => UiTheme.Current.red;               // hazard red (danger role); name kept for FX calls
+        static readonly Color WoodDark = new(0.97f, 0.96f, 0.93f); // hazard white
+        static readonly Color Steel = new(0.9f, 0.9f, 0.88f);
 
         float hp;
         TMPro.TextMeshPro hpText;
@@ -31,7 +34,7 @@ namespace RecruitRush
                 Art.Box("Plank", b.body, new Vector3(0f, 0.3f + i * 0.5f, 0f), new Vector3(width, 0.42f, 0.3f), Art.Lit(i % 2 == 0 ? Wood : WoodDark));
             foreach (int s in new[] { -1, 1 })
                 Art.Box("Post", b.body, new Vector3(s * (width * 0.5f - 0.15f), 0.8f, -0.05f), new Vector3(0.22f, 1.7f, 0.42f), Art.Lit(Steel));
-            Art.Box("Plate", b.body, new Vector3(0f, 0.8f, -0.2f), new Vector3(1.1f, 0.75f, 0.06f), Art.Lit(new Color(0.15f, 0.15f, 0.15f)), null, false);
+            Art.Box("Plate", b.body, new Vector3(0f, 0.8f, -0.2f), new Vector3(1.1f, 0.75f, 0.06f), Art.Lit(UiTheme.Current.slateFace), null, false);
             b.hpText = Art.Text("Hp", b.body, new Vector3(0f, 0.8f, -0.26f), Mathf.CeilToInt(hp).ToString(), 0.6f, Color.white);
             return b;
         }
