@@ -1,10 +1,10 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
 namespace RecruitRush
 {
-    /// <summary>Builds the level and runs the loop: Ready → Playing (lanes → final wave → boss) → Win/Lose.</summary>
+    /// <summary>Builds the level and runs the loop: Ready в†’ Playing (lanes в†’ final wave в†’ boss) в†’ Win/Lose.</summary>
     public class GameManager : MonoBehaviour
     {
         public enum State { Ready, Playing, Win, Lose }
@@ -294,6 +294,7 @@ namespace RecruitRush
             "A red laser means a rifleman is about to fire: step out of his line",
             "Stop the APC before its red DROP line, or it unloads a squad on you",
             "Red circles on the road are artillery: step out before the shell lands",
+            "Enemies blow up on mines too: lead a crowd across a minefield",
             "The gold x2 gate pays off with a big squad, the green one when you can shoot it up",
         };
 

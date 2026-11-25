@@ -53,20 +53,24 @@ namespace RecruitRush
         /// <summary>
         /// Shells arc onto a telegraphed circle where the squad stands (enraged: a second one beside it): step aside.
         /// </summary>
-        /// <summary>Cycle: shells (step aside) → MG run down the squad's corridor (switch corridor) → shells → a low
-        /// wall fired along the road (jump it).</summary>
+        /// <summary>Cycle: shells (step aside) → MG run down the squad's corridor (switch corridor) → shells → a minefield
+        /// shot onto the road with a few grunts behind it (step around or hop it; grunts that walk over it blow up).</summary>
         protected override IEnumerator Attack() => (attackStep++ % 4) switch
         {
             1 => LaneStrafe(muzzle, Enraged ? 0.85f : 1.1f, killsPerHit + 1),
-            3 => Barrier(),
+            3 => Minefield(),
             _ => Shells()
         };
 
-        IEnumerator Barrier()
+        IEnumerator Minefield()
         {
             ExplosionFX.Spawn(muzzle.position, 1.2f, false);
             Sfx.Boom(0.6f);
-            JumpBarrier.Spawn(transform.parent, transform.position.z - depth - 1f, squad);
+            float half = WorldBuilder.HalfWidth - 0.4f, w = half * 2f * 0.45f;
+            float x0 = Mathf.Clamp(squad.transform.position.x - w * 0.5f, -half, half - w);
+            MarchHazard.Spawn(transform.parent, MarchHazard.Kind.Mines, x0, x0 + w, transform.position.z - depth - 2f, squad);
+            var gm = GameManager.I;
+            if (gm && gm.Director) gm.Director.SpawnAdds(3);
             yield return new WaitForSeconds(0.3f);
         }
 

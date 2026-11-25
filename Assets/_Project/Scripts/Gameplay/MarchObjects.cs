@@ -269,6 +269,31 @@ namespace RecruitRush
             return h;
         }
 
+        static bool EnemyOn(Vector3 m)
+        {
+            foreach (var t in Target.All)
+            {
+                if (!t.Alive || t.airHeight > 0f || !(t is Enemy || t is EnemyCrowd)) continue;
+                Vector3 e = t.transform.position;
+                if (Mathf.Abs(e.x - m.x) < t.halfWidth + 0.45f && Mathf.Abs(e.z - m.z) < t.depth + 0.45f) return true;
+            }
+            return false;
+        }
+
+        /// <summary>A mine set off by enemies: kills soldiers around it, shaves a big chunk off a crowd.</summary>
+        static void EnemyBlast(Vector3 m, GameManager gm)
+        {
+            ExplosionFX.Spawn(m + Vector3.up * 0.3f, 1.8f, true);
+            Sfx.Boom(1f);
+            if (gm.Cam) gm.Cam.Shake(0.12f);
+            foreach (var t in Target.All.ToArray())
+            {
+                if (!t.Alive || !(t is Enemy || t is EnemyCrowd)) continue;
+                Vector3 e = t.transform.position;
+                if (Mathf.Abs(e.x - m.x) < t.halfWidth + 1.6f && Mathf.Abs(e.z - m.z) < t.depth + 1.6f) t.TakeHit(9999f);
+            }
+        }
+
         void Update()
         {
             var gm = GameManager.I;
@@ -285,7 +310,16 @@ namespace RecruitRush
                 for (int i = mines.Count - 1; i >= 0; i--)
                 {
                     var m = mines[i];
-                    if (!m || m.position.z > sp.z) continue;
+                    if (!m) { mines.RemoveAt(i); continue; }
+                    // Enemies overtaking the field step on mines too: lure a crowd across it.
+                    if (EnemyOn(m.position))
+                    {
+                        mines.RemoveAt(i);
+                        EnemyBlast(m.position, gm);
+                        Destroy(m.gameObject);
+                        continue;
+                    }
+                    if (m.position.z > sp.z) continue;
                     mines.RemoveAt(i);
                     int hit = squad.Count > 0 && !squad.Airborne ? squad.CountNear(m.position, 1.1f) : 0; // jumping clears mines
                     if (hit > 0)
