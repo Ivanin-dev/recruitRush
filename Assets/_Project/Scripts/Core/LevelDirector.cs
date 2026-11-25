@@ -613,7 +613,8 @@ namespace RecruitRush
                 {
                     BossKind.Juggernaut => BossJuggernaut.Create(field, bossPos, bossHp, Config.bossKills + 1, Config.bossInterval * 1.4f, sz + 7f, squad),
                     BossKind.Tank => BossTank.Create(field, bossPos, bossHp, Config.bossKills, Config.bossInterval, sz + 15f, squad),
-                    _ => BossHelicopter.Create(field, bossPos, bossHp, Config.bossKills + 1, Config.bossInterval * 1.6f, sz + 20f, squad),
+                    _ => BossHelicopter.Create(field, bossPos, Mathf.Round(bossHp * 0.35f / 10f) * 10f, // only hittable ~25% of the time (ramp jumps)
+                        Config.bossKills + 1, Config.bossInterval * 1.6f, sz + 20f, squad),
                 };
                 gm.OnBossSpawned(boss);
             }

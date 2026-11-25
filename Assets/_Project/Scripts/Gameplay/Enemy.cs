@@ -275,8 +275,10 @@ namespace RecruitRush
                 return;
             }
 
-            // Straight down the middle lane: no chasing.
+            // Straight down the middle lane; once past the corridor walls (no walls in the last stretch) it swerves at the
+            // squad so standing in a side corridor doesn't make it run past harmlessly.
             p.z -= (gm.WorldSpeed + runSpeed) * dt;
+            if (p.z < LevelDirector.ExitZ - 0.5f && p.z > sp.z) p.x = Mathf.MoveTowards(p.x, sp.x, (4f + runSpeed * 0.5f) * dt);
             p.y = Mathf.Abs(Mathf.Sin(Time.time * 12f + phase)) * 0.08f;
             transform.position = p;
 

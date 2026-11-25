@@ -50,26 +50,22 @@ namespace RecruitRush
                 turret.rotation = Quaternion.Slerp(turret.rotation, Quaternion.LookRotation(dir), 1f - Mathf.Exp(-5f * dt));
         }
 
+        /// <summary>
+        /// Shells arc onto a telegraphed circle where the squad stands (enraged: a second one beside it): step aside.
+        /// </summary>
         protected override IEnumerator Attack()
         {
-            Vector3 from = muzzle.position;
-            Vector2 off = Random.insideUnitCircle * squad.Radius * 0.5f;
-            Vector3 to = squad.transform.position + new Vector3(off.x, 0f, off.y);
-            ExplosionFX.Spawn(from, 0.9f, false);
-            Sfx.Boom(0.4f);
-
-            var shell = Art.Box("Shell", null, from, Vector3.one * 0.35f, Art.Glow(new Color(1f, 0.6f, 0.2f)), Prims.Sphere, false).transform;
-            const float dur = 0.7f;
-            for (float t = 0f; t < dur; t += Time.deltaTime)
+            int shots = Enraged ? 2 : 1;
+            for (int i = 0; i < shots; i++)
             {
-                float k = t / dur;
-                Vector3 p = Vector3.Lerp(from, to, k);
-                p.y += Mathf.Sin(k * Mathf.PI) * 3f;
-                shell.position = p;
-                yield return null;
+                Vector3 from = muzzle.position;
+                ExplosionFX.Spawn(from, 0.9f, false);
+                Sfx.Boom(0.4f);
+                float x = squad.transform.position.x + (i == 0 ? Random.Range(-0.6f, 0.6f) : Random.Range(2.5f, 4f) * (Random.value < 0.5f ? -1f : 1f));
+                ArtilleryStrike.SpawnShell(transform.parent, from, x, squad, 2f, 1.15f, killsPerHit + 1, new Color(1f, 0.45f, 0.15f),
+                    Vector3.one * 0.38f, Art.Glow(new Color(1f, 0.6f, 0.2f)));
+                yield return new WaitForSeconds(0.25f);
             }
-            Destroy(shell.gameObject);
-            HitSquad(to, killsPerHit, 0.35f);
         }
 
         protected override IEnumerator DeathSequence()

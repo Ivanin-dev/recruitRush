@@ -11,7 +11,7 @@ namespace RecruitRush
     /// </summary>
     public class EnemyCrowd : Target
     {
-        const float Spacing = 0.5f, Drift = 1.6f, ClashTick = 0.05f;
+        const float Spacing = 0.5f, Drift = 3.4f, ClashTick = 0.05f;
 
         int count;
         float hpPer, acc, clashTimer, phase;
@@ -85,8 +85,8 @@ namespace RecruitRush
             }
 
             p.z -= (gm.WorldSpeed + 1.2f) * dt;
-            if (p.z - sp.z > 4f) // closes in sideways while there is still room to react
-                p.x = Mathf.MoveTowards(p.x, sp.x, Drift * dt);
+            // Hunts the squad all the way in (playtest: from the far side it used to just walk past).
+            if (p.z - sp.z > 0.5f) p.x = Mathf.MoveTowards(p.x, sp.x, Drift * dt);
             transform.position = p;
 
             float dx = Mathf.Abs(sp.x - p.x);

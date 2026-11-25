@@ -15,6 +15,7 @@ namespace RecruitRush
 
         Transform model;
         Animator animator;
+        bool hinted;
 
         public static BossJuggernaut Create(Transform parent, Vector3 pos, float hp, int kills, float interval, float stopZ, PlayerSquad squad) =>
             Create<BossJuggernaut>(parent, pos, hp, kills, interval, stopZ, squad);
@@ -62,15 +63,29 @@ namespace RecruitRush
             if (animator) animator.speed = Enraged ? 0.75f : 0.55f;
             if (!Alive) yield break;
 
-            // Shockwave rolls from the giant's feet into the crowd.
+            // Shockwave: a glowing ring spreads from the giant's feet; jump as it reaches the squad and it passes under.
             Vector3 front = home + Vector3.back * (depth + 0.5f);
-            Vector3 target = squad.transform.position;
-            for (int i = 1; i <= 3; i++)
+            front.y = 0f;
+            ExplosionFX.Spawn(front, 2f, true);
+            var gm = GameManager.I;
+            if (gm && gm.Level <= 2 && !hinted) { hinted = true; gm.UI.ShowBanner("TAP TO JUMP THE SHOCKWAVE!", UiTheme.Current.orange); }
+            var ring = Art.Box("Shockwave", null, front + Vector3.up * 0.08f, Vector3.one, Art.Emissive(new Color(1f, 0.5f, 0.15f), 2f), Prims.Cylinder, false).transform;
+            var core = Art.Box("Core", ring, new Vector3(0f, 0.6f, 0f), new Vector3(0.94f, 1f, 0.94f), Art.Lit(new Color(0.55f, 0.5f, 0.45f)), Prims.Cylinder, false);
+            float reach = Mathf.Max(2f, front.z - squad.transform.position.z) + 1f;
+            const float travel = 0.8f;
+            for (float t = 0f; t < travel; t += Time.deltaTime)
             {
-                ExplosionFX.Spawn(Vector3.Lerp(front, target, i / 3f), 1.2f + i * 0.4f, false);
-                yield return new WaitForSeconds(0.06f);
+                float r = Mathf.Lerp(1f, reach, t / travel) * 2f;
+                ring.localScale = new Vector3(r, 0.03f, r);
+                yield return null;
             }
-            HitSquad(target, killsPerHit, 0.6f);
+            Destroy(ring.gameObject);
+            Vector3 target = squad.transform.position;
+            if (squad.Airborne)
+            {
+                if (Alive) WorldText.Callout(target + Vector3.up * 3.2f, "DODGED!", UiTheme.Current.green, 0.9f);
+            }
+            else HitSquad(target, killsPerHit, 0.6f);
         }
 
         protected override void OnEnrage()

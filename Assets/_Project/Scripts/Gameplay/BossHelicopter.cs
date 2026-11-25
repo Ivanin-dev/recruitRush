@@ -4,9 +4,9 @@ using UnityEngine;
 namespace RecruitRush
 {
     /// <summary>
-    /// Boss: a gunship hovering over the road. Each attack marks the squad's corridor with a long blinking red stripe,
-    /// then rakes the whole corridor with its gun: soldiers still inside the stripe are lost. Move to another corridor.
-    /// Readability: the only flying silhouette, and its telegraph is a long lane stripe (artillery uses round circles).
+    /// Boss: a gunship hovering over the road. It fires rocket salvos onto telegraphed circles (step aside), brings ground
+    /// troops every other salvo, and can only be shot from the top of a ramp jump: ramps roll in every few seconds.
+    /// Readability: the only flying silhouette; ramps are gold/black wedges marked RAMP.
     /// </summary>
     public class BossHelicopter : Boss
     {
@@ -18,6 +18,9 @@ namespace RecruitRush
         static readonly Color Tracer = new(1f, 0.35f, 0.2f);
 
         Transform model, rotor, tailRotor, muzzle;
+        float rampTimer = 1.5f;
+        int salvos;
+        bool rampHint;
         float sway;
 
         public static BossHelicopter Create(Transform parent, Vector3 pos, float hp, int kills, float interval, float stopZ, PlayerSquad squad) =>
@@ -31,6 +34,7 @@ namespace RecruitRush
             barHeight = Altitude + 2.4f;
             moveSpeed = 6f;
             attackRange = squad.range + 10f;
+            airHeight = 3f; // only a ramp launch gets the squad this high
 
             // Built facing +Z inside a root already turned toward the squad.
             model = new GameObject("Gunship").transform;
@@ -65,6 +69,7 @@ namespace RecruitRush
 
         protected override void Aim(float dt)
         {
+            TickRamps(dt);
             sway += dt;
             rotor.localRotation = Quaternion.Euler(0f, sway * 900f, 0f);
             tailRotor.localRotation = Quaternion.Euler(sway * 1400f, 0f, 0f);
@@ -80,57 +85,44 @@ namespace RecruitRush
             transform.position = p;
         }
 
-        static float LaneCenter(float x) =>
-            x < -2.95f ? LevelDirector.LeftX : x > 2.95f ? LevelDirector.RightX : LevelDirector.MidX;
-
+        /// <summary>
+        /// Rockets only: a salvo of 2 (enraged 3) rockets arcs onto telegraphed circles around the squad. Step out of
+        /// them. The gunship can't be hit from the ground (see <see cref="Target.airHeight"/>): ride a ramp.
+        /// </summary>
         protected override IEnumerator Attack()
         {
-            // 1) Mark the corridor the squad is standing in.
-            float lane = LaneCenter(squad.transform.position.x);
-            float laneW = LevelDirector.LaneWidth(lane), half = laneW * 0.5f;
-            float z0 = squad.transform.position.z - 3f, z1 = transform.position.z - depth;
-            // Steady (no blinking): a faint lane-wide stripe with solid edges, and a bright fill that sweeps from the
-            // gunship down to the squad as the timer. When the fill reaches the squad, the gun opens up.
-            float len = z1 - z0;
-            var mark = new GameObject("StrafeMark").transform;
-            mark.position = new Vector3(lane, 0f, 0f);
-            Art.Box("Stripe", mark, new Vector3(0f, 0.06f, (z0 + z1) * 0.5f), new Vector3(laneW - 0.3f, 0.01f, len),
-                Art.Translucent(new Color(Danger.r, Danger.g, Danger.b, 0.25f)), null, false);
-            foreach (int s in new[] { -1, 1 })
-                Art.Box("Edge", mark, new Vector3(s * (half - 0.15f), 0.07f, (z0 + z1) * 0.5f), new Vector3(0.18f, 0.01f, len), Art.Emissive(Danger, 2f), null, false);
-            var fill = Art.Box("Fill", mark, new Vector3(0f, 0.065f, z1), new Vector3(laneW - 0.6f, 0.01f, 0.01f),
-                Art.Translucent(new Color(Danger.r, Danger.g * 1.6f, Danger.b, 0.45f)), null, false).transform;
-
-            float warn = Enraged ? 0.8f : 1.1f;
-            for (float t = 0f; t < warn && Alive; t += Time.deltaTime)
+            int rockets = Enraged ? 3 : 2;
+            float sx = squad.transform.position.x;
+            for (int i = 0; i < rockets; i++)
             {
-                float k = t / warn, l = len * k;
-                fill.localScale = new Vector3(laneW - 0.6f, 0.01f, Mathf.Max(0.01f, l));
-                fill.localPosition = new Vector3(0f, 0.065f, z1 - l * 0.5f);
-                yield return null;
+                if (!Alive) yield break;
+                float x = i == 0 ? sx + Random.Range(-0.5f, 0.5f) : sx + (i % 2 == 1 ? -1f : 1f) * Random.Range(2.6f, 4.2f);
+                Vector3 from = muzzle.position + new Vector3(i % 2 == 0 ? 0.9f : -0.9f, 0.2f, 0f);
+                Fx.Muzzle(from, Tracer);
+                Sfx.Boom(0.35f);
+                ArtilleryStrike.SpawnShell(transform.parent, from, x, squad, 1.8f, 1.2f, killsPerHit, Danger,
+                    new Vector3(0.18f, 0.18f, 0.5f), Art.Glow(new Color(1f, 0.55f, 0.2f)));
+                yield return new WaitForSeconds(0.18f);
             }
-            Destroy(mark.gameObject);
-            if (!Alive) yield break;
+            // Every other salvo, ground troops come in with it so standing still is never safe.
+            if (++salvos % 2 == 0 && GameManager.I && GameManager.I.Director) GameManager.I.Director.SpawnAdds(3);
+        }
 
-            // 2) Rake the corridor from the far end down to the squad's line.
-            Sfx.Shot(3);
+        /// <summary>Ramps roll in regularly, near the squad's side of the road: the only way to reach the gunship.</summary>
+        void TickRamps(float dt)
+        {
+            rampTimer -= dt;
+            if (rampTimer > 0f) return;
+            rampTimer = Enraged ? 3.6f : 4.6f;
+            float lim = WorldBuilder.HalfWidth - 2.2f;
+            float x = Mathf.Clamp(squad.transform.position.x + Random.Range(-3.5f, 3.5f), -lim, lim);
+            JumpRamp.Spawn(transform.parent, x, squad.transform.position.z + 26f, squad);
             var gm = GameManager.I;
-            const float rake = 0.45f;
-            for (float t = 0f; t < rake; t += 0.04f)
+            if (!rampHint && gm && gm.Level == Unlocks.Helicopter)
             {
-                float z = Mathf.Lerp(z1, z0, t / rake);
-                Vector3 hit = new Vector3(lane + Random.Range(-half, half) * 0.8f, 0.1f, z);
-                if (gm && gm.Tracers) gm.Tracers.Fire(muzzle.position, hit, Tracer);
-                Fx.Muzzle(muzzle.position, Tracer);
-                if (Random.value < 0.5f) Fx.Sparks(hit, Tracer, 2);
-                yield return new WaitForSeconds(0.04f);
+                rampHint = true;
+                gm.UI.ShowBanner("RUN OVER THE RAMP TO HIT IT!", UiTheme.Current.gold);
             }
-            if (!Alive) yield break;
-
-            // 3) Whoever is still inside the corridor pays (capped at the boss's per-hit kills).
-            int inside = squad.CountInBand(lane - half, lane + half);
-            int kills = Mathf.Min(inside, killsPerHit);
-            if (kills > 0) HitSquad(new Vector3(lane, 0.3f, squad.transform.position.z), kills, 0.35f);
         }
 
         protected override IEnumerator DeathSequence()

@@ -185,6 +185,10 @@ namespace RecruitRush
     /// </summary>
     public class JumpRamp : MonoBehaviour
     {
+        public static readonly System.Collections.Generic.List<JumpRamp> All = new();
+        void OnEnable() => All.Add(this);
+        void OnDisable() => All.Remove(this);
+
         const float HalfWidth = 1.8f;
         static readonly Color Gold = new(1f, 0.75f, 0.15f);
         static readonly Color Dark = new(0.15f, 0.15f, 0.16f);

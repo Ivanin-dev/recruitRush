@@ -39,13 +39,24 @@ namespace RecruitRush
         /// <summary>Grenade thrown from <paramref name="from"/>: smaller, orange, fewer casualties.</summary>
         public static ArtilleryStrike SpawnGrenade(Transform parent, Vector3 from, float x, PlayerSquad squad)
         {
-            var a = Create(parent, x, squad, 1.25f, GrenadeRadius, Threat.Explosive, Threat.Explosive, false);
+            var gm = GameManager.I;
+            int cap = 3 + (gm && gm.Config != null ? gm.Config.level / 4 : 0);
+            return SpawnShell(parent, from, x, squad, GrenadeRadius, 1.25f, cap, Threat.Explosive, new Vector3(0.22f, 0.26f, 0.22f), Art.Lit(GrenadeBody));
+        }
+
+        /// <summary>
+        /// A round lobbed from <paramref name="from"/> onto a telegraphed circle (no cross-hair): grenades, tank shells,
+        /// gunship rockets. Step out of the circle before it lands.
+        /// </summary>
+        public static ArtilleryStrike SpawnShell(Transform parent, Vector3 from, float x, PlayerSquad squad, float radius, float telegraph,
+            int killCap, Color color, Vector3 shellSize, Material shellMat)
+        {
+            var a = Create(parent, x, squad, telegraph, radius, color, color, false);
             a.grenade = true;
             a.throwFrom = from;
-            a.killShare = 0.25f;
-            var gm = GameManager.I;
-            a.killCap = 3 + (gm && gm.Config != null ? gm.Config.level / 4 : 0);
-            a.shell = Art.Box("Grenade", null, from, new Vector3(0.22f, 0.26f, 0.22f), Art.Lit(GrenadeBody), Prims.Sphere, false).transform;
+            a.killShare = 0.3f;
+            a.killCap = killCap;
+            a.shell = Art.Box("Shell", null, from, shellSize, shellMat, Prims.Sphere, false).transform;
             return a;
         }
 

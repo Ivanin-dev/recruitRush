@@ -76,7 +76,13 @@ namespace RecruitRush
 
         float ChooseX()
         {
-            if (gm.Boss != null) return 0f;
+            if (gm.Boss != null)
+            {
+                // Gunship fight: line up with the next ramp ahead.
+                foreach (var r in JumpRamp.All)
+                    if (r.transform.position.z > gm.Squad.transform.position.z) return r.transform.position.x;
+                return 0f;
+            }
             float sz = gm.Squad.transform.position.z;
             float range = gm.Squad.range;
 
