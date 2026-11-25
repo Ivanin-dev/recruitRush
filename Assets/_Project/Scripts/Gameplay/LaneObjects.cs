@@ -110,6 +110,8 @@ namespace RecruitRush
             foreach (int s in new[] { -1, 1 })
                 Art.Box("Frame", c.body, new Vector3(s * 1.08f, 0.64f, -0.02f), new Vector3(0.18f, 1.32f, 1.28f), Art.Lit(Frame), null, false);
             Art.Box("Base", c.body, new Vector3(0f, 0.06f, -0.02f), new Vector3(2.36f, 0.14f, 1.3f), Art.Lit(Frame), null, false);
+            // Soldier crates carry a few recruits on the lid (glowing pad under them): the reward is visible before it's won.
+            if (type == UpgradeType.Soldiers) c.SpawnRiders(Mathf.Clamp(amount / 5, 1, 4));
             c.glowColor = Color.Lerp(col, Color.white, 0.3f);
             c.glowEdge = Art.Box("GlowEdge", c.body, new Vector3(0f, 1.3f, -0.02f), new Vector3(2.34f, 0.12f, 1.3f),
                 Art.Emissive(c.glowColor, 1.4f), null, false).GetComponent<MeshRenderer>();
@@ -128,11 +130,27 @@ namespace RecruitRush
             Art.Fit(face, soldiers ? 1.9f : 1.1f);
             face.transform.localRotation = Quaternion.Euler(50f, 0f, 0f);
             // Floating tag on a dark plate: readable over the light road, never wider than the crate lane.
-            var top = Art.Tag("Top", go.transform, new Vector3(0f, 1.95f, 0f),
+            var top = Art.Tag("Top", go.transform, new Vector3(0f, soldiers ? 2.75f : 1.95f, 0f),
                 soldiers ? Mathf.CeilToInt(hp).ToString() : Upgrades.Label(type, amount), soldiers ? 0.38f : 0.32f,
                 soldiers ? Color.white : Color.Lerp(col, Color.white, 0.25f), 2.6f);
             c.hpText = soldiers ? top : face;
             return c;
+        }
+
+        readonly System.Collections.Generic.List<Transform> riders = new();
+
+        void SpawnRiders(int n)
+        {
+            Art.Box("RiderPad", transform, new Vector3(0f, 1.27f, 0f), new Vector3(0.6f * n + 0.4f, 0.03f, 0.7f), Art.Emissive(UiTheme.Current.blue, 1.6f), null, false);
+            for (int i = 0; i < n; i++)
+            {
+                Transform u = UnitFactory.HasModels
+                    ? UnitFactory.Model(transform, Art.Assets.playerSoldier)
+                    : UnitFactory.Soldier(transform, PlayerSquad.UniformColor, PlayerSquad.HelmetColor, out _);
+                u.localPosition = new Vector3((i - (n - 1) * 0.5f) * 0.6f, 1.29f, 0f);
+                u.localRotation = Quaternion.Euler(0f, 180f, 0f);
+                riders.Add(u);
+            }
         }
 
         void Update()
@@ -157,6 +175,9 @@ namespace RecruitRush
             {
                 // Reached the squad's line unbroken: the upgrade is lost.
                 Alive = false;
+                foreach (var r in riders)
+                    if (r) DeathFly.Launch(r, Vector3.forward);
+                riders.Clear();
                 ExplosionFX.Spawn(p + Vector3.up, 1.2f, true);
                 Destroy(gameObject);
             }
@@ -179,6 +200,9 @@ namespace RecruitRush
             ExplosionFX.Spawn(transform.position + Vector3.up, 2f, Upgrades.Color(type));
             Sfx.Boom(1.2f);
             Haptics.Medium();
+            for (int i = 0; i < riders.Count; i++)
+                if (riders[i]) JoinSquad.Run(riders[i], squad, i * 0.06f);
+            riders.Clear();
             var gm = GameManager.I;
             if (gm) gm.ApplyUpgrade(type, amount);
             Destroy(gameObject);

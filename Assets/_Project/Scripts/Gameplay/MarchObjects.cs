@@ -119,6 +119,7 @@ namespace RecruitRush
                 if (u)
                 {
                     u.SetParent(null, true);
+                    if (shot) GroundSplat.Spawn(u.position);
                     DeathFly.Launch(u, shot ? Vector3.forward : Vector3.forward + Random.insideUnitSphere);
                 }
             }

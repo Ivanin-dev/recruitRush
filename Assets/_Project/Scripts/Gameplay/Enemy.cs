@@ -406,6 +406,7 @@ namespace RecruitRush
                 Destroy(gameObject);
                 return;
             }
+            GroundSplat.Spawn(transform.position);
             DeathFly.Launch(transform, Vector3.forward + Random.insideUnitSphere * 0.5f);
         }
 
