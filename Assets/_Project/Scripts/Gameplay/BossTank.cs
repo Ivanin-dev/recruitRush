@@ -85,11 +85,5 @@ namespace RecruitRush
             }
         }
 
-        protected override IEnumerator DeathSequence()
-        {
-            yield return base.DeathSequence();
-            turret.SetParent(null, true);
-            turret.gameObject.AddComponent<DeathFly>().Init(new Vector3(0.5f, 9f, 2f), new Vector3(120f, 40f, 200f), 2.5f, false);
-        }
     }
 }

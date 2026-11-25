@@ -34,7 +34,7 @@ namespace RecruitRush
                 Art.Box("Plank", b.body, new Vector3(0f, 0.3f + i * 0.5f, 0f), new Vector3(width, 0.42f, 0.3f), Art.Lit(i % 2 == 0 ? Wood : WoodDark));
             foreach (int s in new[] { -1, 1 })
                 Art.Box("Post", b.body, new Vector3(s * (width * 0.5f - 0.15f), 0.8f, -0.05f), new Vector3(0.22f, 1.7f, 0.42f), Art.Lit(Steel));
-            Art.Box("Plate", b.body, new Vector3(0f, 0.8f, -0.2f), new Vector3(1.1f, 0.75f, 0.06f), Art.Lit(UiTheme.Current.slateFace), null, false);
+            Art.MakePill("Plate", b.body, new Vector3(0f, 0.8f, -0.2f), 1.3f, 0.75f, UiTheme.Current.slateFace, UiTheme.Current.slateLip, 0.06f);
             b.hpText = Art.Text("Hp", b.body, new Vector3(0f, 0.8f, -0.26f), Mathf.CeilToInt(hp).ToString(), 0.6f, Color.white);
             Art.Fit(b.hpText, 1f);
             return b;

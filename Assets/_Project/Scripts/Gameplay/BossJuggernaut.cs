@@ -122,24 +122,24 @@ namespace RecruitRush
             else HitSquad(target, killsPerHit, 0.6f);
         }
 
+        bool standing;
+
+        protected override void Update()
+        {
+            base.Update();
+            // Reached its stop line: stand (firing pose) instead of running in place.
+            if (!standing && Alive && animator && transform.position.z <= stopZ + 0.01f && Art.Assets && Art.Assets.shooterAnimator)
+            {
+                standing = true;
+                animator.runtimeAnimatorController = Art.Assets.shooterAnimator;
+            }
+        }
+
         protected override void OnEnrage()
         {
             moveSpeed *= 1.3f;
             if (animator) animator.speed = 0.75f;
         }
 
-        protected override IEnumerator DeathSequence()
-        {
-            yield return base.DeathSequence();
-            if (animator) animator.speed = 0f;
-            // Topple forward.
-            Quaternion start = model.localRotation, end = start * Quaternion.Euler(80f, 0f, 0f);
-            for (float t = 0f; t < 0.8f; t += Time.deltaTime)
-            {
-                model.localRotation = Quaternion.Slerp(start, end, t / 0.8f);
-                yield return null;
-            }
-            ExplosionFX.Spawn(transform.position + Vector3.back * 2f, 3f, true);
-        }
     }
 }

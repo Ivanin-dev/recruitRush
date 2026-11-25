@@ -4,7 +4,7 @@ using UnityEngine;
 namespace RecruitRush
 {
     /// <summary>
-    /// Left lane: a "+1" recruit that joins the squad on contact. Looks: a small blue (own squad) arch over a glowing
+    /// Left lane: a "+1" recruit that joins the squad on contact. Looks: a blue (own squad) arch across the whole corridor over a glowing
     /// pad; bigger bundles are gold (bonus).
     /// </summary>
     public class Pickup : MonoBehaviour
@@ -24,13 +24,15 @@ namespace RecruitRush
             bool big = value > 1;
             var status = big ? ArchStatus.Bonus : ArchStatus.Squad;
             Color c = ArchKit.Role(status);
-            // Glowing pad on the ground + a small arch with a translucent fill.
-            Art.Box("Pad", go.transform, new Vector3(0f, 0.03f, 0f), new Vector3(1.9f, 0.03f, 1.9f), Art.Emissive(c, 1.3f), Prims.Cylinder, false);
-            Art.Box("PadRim", go.transform, new Vector3(0f, 0.02f, 0f), new Vector3(2.15f, 0.02f, 2.15f), Art.Lit(ArchKit.PillarColor), Prims.Cylinder, false);
-            ArchKit.Build(go.transform, 1.5f, 1.6f, status, true, 0.2f, 0.22f);
-            var label = Art.Text("Label", go.transform, new Vector3(0f, 0.85f, -0.2f), "+" + value, 0.6f, Color.white);
-            Art.Fit(label, 1.1f);
+            // Glowing pad on the ground + an arch spanning the whole left corridor (wall to road edge), translucent fill.
+            float w = LevelDirector.SideWidth - 0.4f;
+            Art.Box("Pad", go.transform, new Vector3(0f, 0.03f, 0f), new Vector3(w, 0.03f, 1.6f), Art.Emissive(c, 1.3f), null, false);
+            Art.Box("PadRim", go.transform, new Vector3(0f, 0.02f, 0f), new Vector3(w + 0.25f, 0.02f, 1.8f), Art.Lit(ArchKit.PillarColor), null, false);
+            ArchKit.Build(go.transform, w, 1.9f, status, true, 0.22f, 0.24f);
+            var label = Art.Text("Label", go.transform, new Vector3(0f, 0.95f, -0.2f), "+" + value, 0.75f, Color.white);
+            Art.Fit(label, 2.2f);
             label.transform.localRotation = Quaternion.Euler(55f, 0f, 0f);
+            label.GetComponent<MeshRenderer>().sortingOrder = 10; // over the arch's translucent fill
             return p;
         }
 
@@ -44,7 +46,7 @@ namespace RecruitRush
 
             Vector3 sp = squad.transform.position;
             if (squad.Count > 0 && Mathf.Abs(p.z - sp.z) < squad.Radius * 0.5f + 0.3f &&
-                Mathf.Abs(p.x - sp.x) < squad.Radius + 0.6f)
+                Mathf.Abs(p.x - sp.x) < LevelDirector.SideWidth * 0.5f + squad.Radius * 0.3f) // anywhere under the arch
             {
                 taken = true;
                 squad.Add(value);
@@ -128,9 +130,8 @@ namespace RecruitRush
             if (!soldiers)
             {
                 // HP plate: deep indigo, so the white number reads on any role color.
-                var plate = Art.Box("HpPlate", c.body, new Vector3(0f, 0.8f, -0.8f), new Vector3(1.25f, 0.62f, 0.05f),
-                    Art.Lit(UiTheme.Current.slateFace), null, false);
-                plate.transform.localRotation = Quaternion.Euler(50f, 0f, 0f);
+                var plate = Art.MakePill("HpPlate", c.body, new Vector3(0f, 0.8f, -0.8f), 1.4f, 0.62f, UiTheme.Current.slateFace, UiTheme.Current.slateLip, 0.05f);
+                plate.root.localRotation = Quaternion.Euler(50f, 0f, 0f);
             }
             var face = Art.Text("Face", c.body, soldiers ? new Vector3(0f, 0.95f, -0.3f) : new Vector3(0f, 0.8f, -0.86f),
                 soldiers ? Upgrades.Label(type, amount) : Mathf.CeilToInt(hp).ToString(), 0.62f, Color.white);
@@ -152,7 +153,7 @@ namespace RecruitRush
             for (int i = 0; i < n; i++)
             {
                 Transform u = UnitFactory.HasModels
-                    ? UnitFactory.Model(transform, Art.Assets.playerSoldier)
+                    ? UnitFactory.Model(transform, Art.Assets.playerSoldier, UnitFactory.SoldierHeight, Art.Assets.shooterAnimator) // standing, not running in place
                     : UnitFactory.Soldier(transform, PlayerSquad.UniformColor, PlayerSquad.HelmetColor, out _);
                 u.localPosition = new Vector3((i - (n - 1) * 0.5f) * 0.6f, 1.29f, 0f);
                 u.localRotation = Quaternion.Euler(0f, 180f, 0f);

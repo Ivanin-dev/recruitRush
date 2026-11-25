@@ -147,20 +147,5 @@ namespace RecruitRush
             }
         }
 
-        protected override IEnumerator DeathSequence()
-        {
-            yield return base.DeathSequence();
-            // Spin out and crash.
-            Vector3 start = model.localPosition;
-            for (float t = 0f; t < 1.1f; t += Time.deltaTime)
-            {
-                float k = t / 1.1f;
-                model.localPosition = new Vector3(start.x, Mathf.Lerp(start.y, 0.4f, k * k), start.z);
-                model.localRotation = Quaternion.Euler(20f * k, t * 540f, 25f * k);
-                yield return null;
-            }
-            ExplosionFX.Spawn(transform.position + Vector3.up, 3.2f, true);
-            Sfx.Boom(2f);
-        }
     }
 }

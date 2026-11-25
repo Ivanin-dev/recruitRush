@@ -200,22 +200,76 @@ namespace RecruitRush
         protected virtual void Die()
         {
             Alive = false;
-            var burnt = Art.Lit(new Color(0.12f, 0.11f, 0.1f));
-            foreach (var r in renderers)
-                if (r) r.sharedMaterial = burnt;
             hpBar.gameObject.SetActive(false);
             StartCoroutine(DeathSequence());
             Died?.Invoke();
         }
 
+        Vector3 BodyCenter()
+        {
+            var b = new Bounds(transform.position + Vector3.up * hitHeight, Vector3.zero);
+            foreach (var r in renderers)
+                if (r) b.Encapsulate(r.bounds);
+            return b.center;
+        }
+
+        /// <summary>
+        /// Same finale for every boss: a short agony (shudder, white blinks, small blasts), then one big gold-sparked
+        /// explosion and the wreck pops out of existence (swell, spin, shrink) while debris flies.
+        /// </summary>
         protected virtual IEnumerator DeathSequence()
         {
-            for (int i = 0; i < 4; i++)
+            var white = Art.Lit(Color.white);
+            var originals = new Material[renderers.Count];
+            for (int i = 0; i < renderers.Count; i++) originals[i] = renderers[i] ? renderers[i].sharedMaterial : null;
+            void Blink(bool on)
             {
-                ExplosionFX.Spawn(transform.position + new Vector3(Random.Range(-1.5f, 1.5f), Random.Range(0.6f, 2.2f), Random.Range(-1.5f, 1.5f)),
-                    2.5f + i * 0.4f, true);
-                yield return new WaitForSeconds(0.12f);
+                for (int i = 0; i < renderers.Count; i++)
+                    if (renderers[i]) renderers[i].sharedMaterial = on ? white : originals[i];
             }
+
+            // 1) Agony.
+            Vector3 home = transform.position;
+            float size = Mathf.Max(1.5f, halfWidth);
+            const float agony = 0.75f;
+            int blasts = 0;
+            for (float t = 0f; t < agony; t += Time.deltaTime)
+            {
+                transform.position = home + Random.insideUnitSphere * 0.12f;
+                Blink(Mathf.Repeat(t * 12f, 1f) < 0.35f);
+                if (t > blasts * 0.18f)
+                {
+                    blasts++;
+                    ExplosionFX.Spawn(BodyCenter() + Random.insideUnitSphere * size, 1.4f, false);
+                    Fx.Sparks(BodyCenter(), new Color(1f, 0.8f, 0.4f), 6);
+                    Sfx.Boom(0.6f);
+                }
+                yield return null;
+            }
+            transform.position = home;
+            Blink(false);
+
+            // 2) Finale.
+            Vector3 c = BodyCenter();
+            ExplosionFX.Spawn(c, 4.5f, true);
+            ExplosionFX.Spawn(c + Vector3.up * 0.8f, 3f, UiTheme.Current.gold);
+            Fx.Sparks(c, UiTheme.Current.gold, 40);
+            Sfx.Boom(3f);
+            Haptics.Heavy();
+            var gm = GameManager.I;
+            if (gm && gm.Cam) gm.Cam.Shake(0.8f);
+
+            // 3) Pop: swell, then spin and shrink to nothing.
+            Vector3 s0 = transform.localScale;
+            for (float t = 0f; t < 0.4f; t += Time.deltaTime)
+            {
+                float k = t / 0.4f;
+                float s = k < 0.25f ? Mathf.Lerp(1f, 1.18f, k / 0.25f) : Mathf.Lerp(1.18f, 0f, (k - 0.25f) / 0.75f);
+                transform.localScale = s0 * s;
+                transform.Rotate(0f, 720f * Time.deltaTime, 0f, Space.World);
+                yield return null;
+            }
+            gameObject.SetActive(false);
         }
     }
 }

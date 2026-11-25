@@ -302,6 +302,9 @@ namespace RecruitRush
         void DigIn()
         {
             dugIn = true;
+            // Stopped: swap the run loop for the standing firing pose (no running in place).
+            var anim = GetComponentInChildren<Animator>();
+            if (anim && Art.Assets && Art.Assets.shooterAnimator) anim.runtimeAnimatorController = Art.Assets.shooterAnimator;
             Vector3 p = transform.position;
             p.y = 0f;
             transform.position = p;

@@ -167,7 +167,7 @@ namespace RecruitRush
             for (int i = 0; i < visible; i++)
             {
                 Transform u;
-                if (UnitFactory.HasModels) u = UnitFactory.Model(go.transform, Art.Assets.playerSoldier);
+                if (UnitFactory.HasModels) u = UnitFactory.Model(go.transform, Art.Assets.playerSoldier, UnitFactory.SoldierHeight, Art.Assets.shooterAnimator);
                 else u = UnitFactory.Soldier(go.transform, PlayerSquad.UniformColor, PlayerSquad.HelmetColor, out _);
                 u.localPosition = Formation.Slot(i, 0.45f);
                 u.localRotation = Quaternion.Euler(0f, 180f, 0f); // waving at the squad

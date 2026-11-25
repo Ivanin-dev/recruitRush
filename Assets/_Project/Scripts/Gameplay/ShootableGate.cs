@@ -14,7 +14,7 @@ namespace RecruitRush
 
         float value, growthStep, cap;
         PlayerSquad squad;
-        MeshRenderer plate;
+        Art.Pill plate;
         TMPro.TextMeshPro label;
         ArchKit.Arch arch;
         float punch, hitGlow;
@@ -51,13 +51,14 @@ namespace RecruitRush
 
         // Value readability: a solid plate in a deep shade of the gate's color behind a big white number, drawn over the
         // arch's translucent fill (which used to wash the number out on the light road).
-        public static Material PlateMat(ArchStatus s) => Art.Lit(Color.Lerp(ArchKit.Role(s), Color.black, 0.35f));
+        static Color PlateFace(ArchStatus s) => Color.Lerp(ArchKit.Role(s), Color.black, 0.3f);
+        static Color PlateLip(ArchStatus s) => Color.Lerp(ArchKit.Role(s), Color.black, 0.6f);
 
-        public static MeshRenderer ValuePlate(Transform parent, float width, ArchStatus s)
+        public static Art.Pill ValuePlate(Transform parent, float width, ArchStatus s)
         {
-            var p = Art.Box("ValuePlate", parent, new Vector3(0f, 1.45f, -0.2f), new Vector3(Mathf.Min(width - 1.2f, 3.4f), 1.35f, 0.06f), PlateMat(s), null, false);
-            p.transform.localRotation = Quaternion.Euler(35f, 0f, 0f);
-            return p.GetComponent<MeshRenderer>();
+            var p = Art.MakePill("ValuePlate", parent, new Vector3(0f, 1.45f, -0.2f), Mathf.Min(width - 1.2f, 3.4f), 1.35f, PlateFace(s), PlateLip(s), 0.06f);
+            p.root.localRotation = Quaternion.Euler(35f, 0f, 0f);
+            return p;
         }
 
         public static TMPro.TextMeshPro ValueLabel(Transform parent, string text, float width, float height)
@@ -77,7 +78,7 @@ namespace RecruitRush
             if (status != arch.status)
             {
                 arch.SetStatus(status);
-                plate.sharedMaterial = PlateMat(status);
+                plate.SetColors(PlateFace(status), PlateLip(status));
                 if (status == ArchStatus.Positive) punch = 2f; // turned good: bigger pop
             }
         }

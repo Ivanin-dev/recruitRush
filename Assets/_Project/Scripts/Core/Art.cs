@@ -107,6 +107,44 @@ namespace RecruitRush
             return tm;
         }
 
+        /// <summary>A rounded "pill" plate in the UI's chunky style: face + a darker lip peeking out below.</summary>
+        public class Pill
+        {
+            public Transform root;
+            public MeshRenderer[] face, lip;
+
+            public void SetColors(Color f, Color l)
+            {
+                foreach (var r in face) r.sharedMaterial = Lit(f);
+                foreach (var r in lip) r.sharedMaterial = Lit(l);
+            }
+        }
+
+        /// <summary>Pill plate facing -Z of its parent (put text a little in front of it, at z = -0.03).</summary>
+        public static Pill MakePill(string name, Transform parent, Vector3 localPos, float width, float height, Color face, Color lip, float depth = 0.04f)
+        {
+            var root = new GameObject(name).transform;
+            root.SetParent(parent, false);
+            root.localPosition = localPos;
+            var pill = new Pill { root = root };
+            float mid = Mathf.Max(0f, width - height), lipDrop = height * 0.12f;
+            MeshRenderer[] Layer(Color c, float y, float z)
+            {
+                var parts = new MeshRenderer[3];
+                parts[0] = Box("Mid", root, new Vector3(0f, y, z), new Vector3(mid, height, depth), Lit(c), null, false).GetComponent<MeshRenderer>();
+                for (int s = 0; s < 2; s++)
+                {
+                    var cap = Box("Cap", root, new Vector3((s == 0 ? -0.5f : 0.5f) * mid, y, z), new Vector3(height, depth * 0.5f, height), Lit(c), Prims.Cylinder, false);
+                    cap.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+                    parts[s + 1] = cap.GetComponent<MeshRenderer>();
+                }
+                return parts;
+            }
+            pill.lip = Layer(lip, -lipDrop, 0.015f);
+            pill.face = Layer(face, 0f, 0f);
+            return pill;
+        }
+
         /// <summary>
         /// A floating label on a dark rounded-ish plate (camera-facing): readable over the light road, sized to the
         /// text and capped at <paramref name="maxWidth"/>. Returns the text so callers can update it.
@@ -119,8 +157,7 @@ namespace RecruitRush
             root.gameObject.AddComponent<Billboard>();
             var tm = Fit(Text("Text", root, new Vector3(0f, 0f, -0.03f), text, height, color), maxWidth - height * 0.6f);
             float w = Mathf.Min(maxWidth, tm.GetPreferredValues(text, 100f, 10f).x + height * 0.9f);
-            Box("Plate", root, Vector3.zero, new Vector3(Mathf.Max(w, height * 1.8f), height * 1.45f, 0.04f),
-                Lit(UiTheme.Current.slateFace), null, false);
+            MakePill("Plate", root, Vector3.zero, Mathf.Max(w, height * 1.8f), height * 1.45f, UiTheme.Current.slateFace, UiTheme.Current.slateLip);
             return tm;
         }
 
