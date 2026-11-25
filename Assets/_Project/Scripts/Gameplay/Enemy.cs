@@ -287,7 +287,7 @@ namespace RecruitRush
             {
                 Alive = false;
                 // A breach only costs rank and file; a lone commander survives it (ramming still hurts).
-                int cost = rammed ? breachCost : Mathf.Min(breachCost, squad.Count - 1);
+                int cost = breachCost; // breaches cost full price: a careless commander can fall
                 if (cost > 0) squad.SetCount(squad.Count - cost, rammed ? p : sp + Vector3.forward);
                 if (Kind == EnemyKind.Kamikaze) ExplosiveBarrel.Blast(p, false, BomberBlast);
                 else Fx.Sparks(rammed ? p + Vector3.up * 0.5f : new Vector3(p.x, 0.6f, sp.z), new Color(1f, 0.3f, 0.25f), 8);
@@ -319,7 +319,7 @@ namespace RecruitRush
         void Rifle(GameManager gm, Vector3 p, Vector3 sp, float dt)
         {
             fireTimer += dt;
-            bool aiming = fireTimer >= RifleCycle - RifleAim && squad.Count > 1;
+            bool aiming = fireTimer >= RifleCycle - RifleAim && squad.Count > 0;
             Vector3 muzzle = Muzzle(p);
             Vector3 aim = sp + new Vector3(aimOffset.x, 0.5f, aimOffset.y);
             aim.x = Mathf.Clamp(aim.x, p.x - Sector, p.x + Sector);
@@ -344,7 +344,7 @@ namespace RecruitRush
             if (fireTimer < RifleCycle) return;
             fireTimer = 0f;
             if (laser) laser.gameObject.SetActive(false);
-            if (squad.Count <= 1) return;
+            if (squad.Count <= 0) return;
             Fx.Muzzle(muzzle, EnemyTracer);
             if (Mathf.Abs(sp.x - p.x) < Sector)
             {
@@ -358,7 +358,7 @@ namespace RecruitRush
         void Grenade(GameManager gm, Vector3 p, Vector3 sp, float dt)
         {
             fireTimer -= dt;
-            if (fireTimer > 0f || squad.Count <= 1) return;
+            if (fireTimer > 0f || squad.Count <= 0) return;
             fireTimer = Random.Range(2.6f, 3.2f);
             ArtilleryStrike.SpawnGrenade(transform.parent, p + Vector3.up * 1f, sp.x + Random.Range(-0.8f, 0.8f), squad);
             Pop.Play(transform, 0.85f);

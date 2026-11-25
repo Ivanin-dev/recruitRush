@@ -66,7 +66,7 @@ namespace RecruitRush
         public float turretHp;
         public float bossHp;
         public int bossKills;
-        public float bossInterval = 1.5f;
+        public float bossInterval = 1.25f;
         public float rewardMul = 1f;
         public readonly List<Segment> segments = new();
 
@@ -93,7 +93,7 @@ namespace RecruitRush
         }
 
         /// <summary>How long the boss should take to kill at the squad's current DPS: its HP never drops below that.</summary>
-        public float BossSeconds => Mathf.Min(10f + level * 0.9f, 28f);
+        public float BossSeconds => Mathf.Min(13f + level * 1.1f, 34f);
 
         public static string TypeName(LevelType t) => t switch
         {
@@ -181,7 +181,8 @@ namespace RecruitRush
             c.boss = BossFor(level);
 
             // ---- Pressure: beat × modifier compensation × retry relief.
-            float pressureMul = c.beat == LevelBeat.Elite ? 1.12f : c.beat == LevelBeat.Breather ? 0.88f : 1f;
+            // Playtest: "too easy, impossible to lose" -> a flat 18% more pressure everywhere.
+            float pressureMul = 1.18f * (c.beat == LevelBeat.Elite ? 1.12f : c.beat == LevelBeat.Breather ? 0.88f : 1f);
             pressureMul *= 1f - 0.08f * Mathf.Min(fails, 3);
             int more = Mathf.Min(14, level - 1) + (c.beat == LevelBeat.Elite ? 3 : c.beat == LevelBeat.Breather ? -2 : 0);
             switch (c.mod)
@@ -400,7 +401,7 @@ namespace RecruitRush
 
         public const float MarchSpeedMul = 1.5f;
         /// <summary>Seconds of the squad's full fire an enemy crowd soaks in total: about 70% of it gets shot down.</summary>
-        const float CrowdSoak = 4f;
+        const float CrowdSoak = 3.2f;
 
         enum MarchKind { Recruits, Gates, Wire, Mines, Crowd }
 

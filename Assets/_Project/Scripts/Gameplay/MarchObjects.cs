@@ -75,14 +75,8 @@ namespace RecruitRush
                 if (clashTimer > 0f) return;
                 clashTimer = ClashTick;
                 int k = Mathf.Max(1, Mathf.Min(count, squad.Count) / 12);
-                // The commander never falls in a clash: once only he is left, he finishes the rest point-blank.
-                k = Mathf.Min(k, count, squad.Count - 1);
-                if (k <= 0)
-                {
-                    while (count > 0) RemoveOne(true);
-                    Finish();
-                    return;
-                }
+                k = Mathf.Min(k, count, squad.Count);
+                if (k <= 0) { Finish(); return; }
                 squad.SetCount(squad.Count - k, p);
                 for (int i = 0; i < k; i++) RemoveOne(false);
                 Fx.Sparks(Vector3.Lerp(p, sp, 0.5f) + Vector3.up * 0.5f, new Color(1f, 0.35f, 0.25f), 3);
@@ -104,7 +98,7 @@ namespace RecruitRush
                 Haptics.Medium();
                 if (gm.Cam) gm.Cam.Shake(0.15f);
             }
-            else if (p.z < sp.z - 3f) Destroy(gameObject); // stepped around it
+            else if (p.z < sp.z - 8f) Destroy(gameObject); // stepped around it
         }
 
         void Finish()
@@ -269,7 +263,7 @@ namespace RecruitRush
                     h.lights.Add(Art.Box("Light", m, new Vector3(0f, 1.6f, 0f), new Vector3(0.35f, 1.2f, 0.35f), Art.Glow(th.red), Prims.Sphere, false));
                 }
                 // A faint red patch marks the field as a zone, not scattered junk.
-                Art.Box("Zone", go.transform, new Vector3(0f, 0.025f, 0f), new Vector3(w, 0.01f, 4f),
+                Art.Box("Zone", go.transform, new Vector3(0f, 0.06f, 0f), new Vector3(w, 0.01f, 4f),
                     Art.Translucent(new Color(th.red.r, th.red.g * 0.3f, th.red.b * 0.3f, 0.22f)), null, false);
             }
             return h;
@@ -293,10 +287,10 @@ namespace RecruitRush
                     var m = mines[i];
                     if (!m || m.position.z > sp.z) continue;
                     mines.RemoveAt(i);
-                    int hit = squad.Count > 1 ? squad.CountNear(m.position, 1.1f) : 0;
+                    int hit = squad.Count > 0 ? squad.CountNear(m.position, 1.1f) : 0;
                     if (hit > 0)
                     {
-                        int kills = Mathf.Min(hit, 3, squad.Count - 1);
+                        int kills = Mathf.Min(hit, 3);
                         ExplosionFX.Spawn(m.position + Vector3.up * 0.3f, 1.5f, true);
                         Sfx.Boom(0.9f);
                         Haptics.Medium();
@@ -312,11 +306,11 @@ namespace RecruitRush
             if (!done && p.z <= sp.z)
             {
                 done = true;
-                if (squad.Count > 1)
+                if (squad.Count > 0)
                 {
                     // Everyone inside the fence's span gets cut; capped so one fence never wipes a big squad.
                     int hit = squad.CountInBand(x0 + 0.2f, x1 - 0.2f);
-                    int kills = Mathf.Min(hit, Mathf.Max(2, Mathf.CeilToInt(squad.Count * 0.4f)), squad.Count - 1);
+                    int kills = Mathf.Min(hit, Mathf.Max(2, Mathf.CeilToInt(squad.Count * 0.4f)));
                     if (kills > 0)
                     {
                         squad.SetCount(squad.Count - kills, new Vector3(Mathf.Clamp(sp.x, x0, x1), 0.5f, p.z));

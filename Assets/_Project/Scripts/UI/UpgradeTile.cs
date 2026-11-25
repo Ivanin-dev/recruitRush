@@ -157,7 +157,7 @@ namespace RecruitRush
                 button.button.interactable = false;
                 return;
             }
-            levelText.text = "Lv." + level + "/" + MetaProgress.MaxLevel;
+            levelText.text = "Lv." + level;
             effectText.text = maxed ? "" : effect;
 
             Color face = affordable ? th.green : maxed ? th.gold : th.slateDeep;

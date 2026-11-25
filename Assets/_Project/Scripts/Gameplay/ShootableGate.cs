@@ -95,7 +95,7 @@ namespace RecruitRush
         void Update()
         {
             var gm = GameManager.I;
-            if (done || squad == null || !gm) return;
+            if (squad == null || !gm) return;
             Vector3 p = transform.position;
             p.z -= gm.LaneSpeed(p.x) * Time.deltaTime;
             transform.position = p;
@@ -109,11 +109,15 @@ namespace RecruitRush
             arch.Tick(Time.deltaTime, hitGlow);
 
             Vector3 sp = squad.transform.position;
+            if (done)
+            {
+                if (p.z < sp.z - 8f) Destroy(gameObject); // rolls on past the squad before vanishing
+                return;
+            }
             if (p.z > sp.z) return;
             done = true;
             Alive = false;
             if (Mathf.Abs(sp.x - p.x) < halfWidth + squad.Radius * 0.3f && OnSide(splitX, p.x, sp.x)) gm.ApplyGate(Value, p);
-            Destroy(gameObject);
         }
     }
 
@@ -153,7 +157,7 @@ namespace RecruitRush
         void Update()
         {
             var gm = GameManager.I;
-            if (done || squad == null || !gm) return;
+            if (squad == null || !gm) return;
             Vector3 p = transform.position;
             p.z -= gm.LaneSpeed(p.x) * Time.deltaTime;
             transform.position = p;
@@ -161,6 +165,11 @@ namespace RecruitRush
             arch.Tick(Time.deltaTime, (Mathf.Sin(Time.time * 4f) * 0.5f + 0.5f) * 0.35f);
 
             Vector3 sp = squad.transform.position;
+            if (done)
+            {
+                if (p.z < sp.z - 8f) Destroy(gameObject);
+                return;
+            }
             if (p.z > sp.z) return;
             done = true;
             if (Mathf.Abs(sp.x - p.x) < halfWidth + squad.Radius * 0.3f && ShootableGate.OnSide(splitX, p.x, sp.x))
@@ -168,7 +177,7 @@ namespace RecruitRush
                 if (divide) gm.ApplyDivide(factor, p);
                 else gm.ApplyMultiplier(factor, p);
             }
-            Destroy(gameObject);
+
         }
     }
 }

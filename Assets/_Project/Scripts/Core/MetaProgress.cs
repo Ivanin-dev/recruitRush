@@ -13,18 +13,22 @@ namespace RecruitRush
         const string CoinsKey = "rr_coins";
         static readonly string[] LevelKeys = { "rr_meta_squad", "rr_meta_damage", "rr_meta_rate" };
 
-        // Short, weak tracks on purpose: meta helps a little, the run itself (crates, gates, gun tiers) is what wins.
-        // Full Damage + Rate = x1.4 dmg, x1.3 rate; full Squad = +10 starting soldiers.
-        public const int MaxLevel = 10;
+        // Endless but weak: the first SoftCap levels give the full step, after that each level gives a small step and
+        // costs grow gently, so there is always something to buy while the run itself (crates, gates, gun tiers)
+        // stays what wins. Damage: +4%/lvl to x1.4, then +1%/lvl. Rate: +3% to x1.3, then +0.8%. Squad: +1 per level
+        // to +10, then +1 every 3 levels.
+        public const int SoftCap = 10;
         static readonly int[] BaseCost = { 50, 80, 80 };
         static readonly float[] CostGrowth = { 1.45f, 1.5f, 1.5f };
+        const float LateGrowth = 1.12f;
 
-        /// <summary>Extra starting soldiers per Squad level.</summary>
+        /// <summary>Extra starting soldiers per Squad level (before the soft cap).</summary>
         public const int SoldiersPerLevel = 1;
-        /// <summary>Damage multiplier gained per Damage level.</summary>
+        /// <summary>Damage multiplier gained per Damage level (before the soft cap).</summary>
         public const float DamagePerLevel = 0.04f;
-        /// <summary>Fire-rate multiplier gained per Fire Rate level.</summary>
+        /// <summary>Fire-rate multiplier gained per Fire Rate level (before the soft cap).</summary>
         public const float RatePerLevel = 0.03f;
+        const float LateDamage = 0.01f, LateRate = 0.008f;
 
         /// <summary>A reward chest every N cleared levels.</summary>
         public const int RewardEvery = 3;
@@ -35,28 +39,32 @@ namespace RecruitRush
             set => PlayerPrefs.SetInt(CoinsKey, Mathf.Max(0, value));
         }
 
-        /// <summary>Displayed level: levels bought, 0..<see cref="MaxLevel"/>.</summary>
+        /// <summary>Displayed level: levels bought.</summary>
         public static int Level(MetaUpgrade u) => Bought(u);
 
-        // Clamped: saves from the old 40-level tracks simply count as maxed.
-        static int Bought(MetaUpgrade u) => Mathf.Min(PlayerPrefs.GetInt(LevelKeys[(int)u], 0), MaxLevel);
+        static int Bought(MetaUpgrade u) => Mathf.Max(0, PlayerPrefs.GetInt(LevelKeys[(int)u], 0));
 
         /// <summary>Upgrades open up with progress (see <see cref="Unlocks"/>).</summary>
         public static bool Unlocked(MetaUpgrade u, int level) => level >= Unlocks.UpgradeLevel(u);
 
-        public static bool Maxed(MetaUpgrade u) => Bought(u) >= MaxLevel;
+        /// <summary>Tracks never max out any more (kept for the UI's MAX state).</summary>
+        public static bool Maxed(MetaUpgrade u) => false;
 
         public static int Cost(MetaUpgrade u) => CostAt(u, Bought(u));
 
         /// <summary>Price of the level bought after <paramref name="bought"/> purchases (rounded to 5).</summary>
-        public static int CostAt(MetaUpgrade u, int bought) =>
-            Mathf.RoundToInt(BaseCost[(int)u] * Mathf.Pow(CostGrowth[(int)u], bought) / 5f) * 5;
+        public static int CostAt(MetaUpgrade u, int bought)
+        {
+            int early = Mathf.Min(bought, SoftCap), late = Mathf.Max(0, bought - SoftCap);
+            float c = BaseCost[(int)u] * Mathf.Pow(CostGrowth[(int)u], early) * Mathf.Pow(LateGrowth, late);
+            return Mathf.Min(Mathf.RoundToInt(c / 5f) * 5, 9_999_995);
+        }
 
         /// <summary>How many consecutive levels <paramref name="coins"/> pay for (capped at <paramref name="cap"/>).</summary>
         public static int Affordable(MetaUpgrade u, int coins, int cap = 99)
         {
             int n = 0, bought = Bought(u);
-            while (n < cap && bought + n < MaxLevel)
+            while (n < cap)
             {
                 int c = CostAt(u, bought + n);
                 if (coins < c) break;
@@ -66,7 +74,7 @@ namespace RecruitRush
             return n;
         }
 
-        public static bool CanAfford(MetaUpgrade u) => !Maxed(u) && Coins >= Cost(u);
+        public static bool CanAfford(MetaUpgrade u) => Coins >= Cost(u);
 
         public static bool TryBuy(MetaUpgrade u)
         {
@@ -77,9 +85,32 @@ namespace RecruitRush
             return true;
         }
 
-        public static int BonusSoldiers => Bought(MetaUpgrade.Squad) * SoldiersPerLevel;
-        public static float DamageMul => 1f + Bought(MetaUpgrade.Damage) * DamagePerLevel;
-        public static float RateMul => 1f + Bought(MetaUpgrade.FireRate) * RatePerLevel;
+        static float Track(int n, float step, float late) => Mathf.Min(n, SoftCap) * step + Mathf.Max(0, n - SoftCap) * late;
+
+        public static int BonusSoldiers
+        {
+            get
+            {
+                int n = Bought(MetaUpgrade.Squad);
+                return Mathf.Min(n, SoftCap) * SoldiersPerLevel + Mathf.Max(0, n - SoftCap) / 3;
+            }
+        }
+
+        public static float DamageMul => 1f + Track(Bought(MetaUpgrade.Damage), DamagePerLevel, LateDamage);
+        public static float RateMul => 1f + Track(Bought(MetaUpgrade.FireRate), RatePerLevel, LateRate);
+
+        /// <summary>What buying the next level gives, for the lobby tile ("+4% DMG", "+1 SOLDIER"...).</summary>
+        public static string NextGain(MetaUpgrade u)
+        {
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            bool late = Bought(u) >= SoftCap;
+            return u switch
+            {
+                MetaUpgrade.Squad => late ? "+1 SOLDIER / 3 LV" : "+1 SOLDIER",
+                MetaUpgrade.Damage => "+" + ((late ? LateDamage : DamagePerLevel) * 100f).ToString("0.#", inv) + "% DMG",
+                _ => "+" + ((late ? LateRate : RatePerLevel) * 100f).ToString("0.#", inv) + "% RATE"
+            };
+        }
 
         // ---------------- Reward track ----------------
 

@@ -130,12 +130,12 @@ namespace RecruitRush
                 if (t is Enemy && t.Alive && (t.transform.position - p).sqrMagnitude < radius * radius)
                     t.TakeHit(9999f);
 
-            if (squad.Count > 1)
+            if (squad.Count > 0)
             {
                 int hit = squad.CountNear(p, radius);
                 // Cap: a direct hit hurts but never wipes a big squad, and the commander alone always survives.
                 int cap = Mathf.Min(killCap, Mathf.Max(2, Mathf.CeilToInt(squad.Count * killShare)));
-                int kills = Mathf.Min(hit, cap, squad.Count - 1);
+                int kills = Mathf.Min(hit, cap);
                 if (kills > 0) squad.SetCount(squad.Count - kills, p);
             }
             Destroy(gameObject);

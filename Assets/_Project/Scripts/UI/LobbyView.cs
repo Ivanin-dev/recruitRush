@@ -291,16 +291,7 @@ namespace RecruitRush
             }
         }
 
-        static string Effect(MetaUpgrade u)
-        {
-            var inv = System.Globalization.CultureInfo.InvariantCulture;
-            return u switch
-            {
-                MetaUpgrade.Squad => "+" + MetaProgress.SoldiersPerLevel + (MetaProgress.SoldiersPerLevel == 1 ? " SOLDIER" : " SOLDIERS"),
-                MetaUpgrade.Damage => "+" + (MetaProgress.DamagePerLevel * 100f).ToString("0", inv) + "% DMG",
-                _ => "+" + (MetaProgress.RatePerLevel * 100f).ToString("0", inv) + "% RATE"
-            };
-        }
+        static string Effect(MetaUpgrade u) => MetaProgress.NextGain(u);
 
         void Buy(int i)
         {

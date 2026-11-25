@@ -39,7 +39,7 @@ namespace RecruitRush
     }
 
     /// <summary>
-    /// Dark splat left on the road where an enemy falls: rides the conveyor, then shrinks away. Gives fights a
+    /// Dark splat left on the road where an enemy falls: stays where it fell (the road itself never moves), then shrinks away. Gives fights a
     /// sense of weight without piling up (hard cap on how many exist).
     /// </summary>
     public class GroundSplat : MonoBehaviour
@@ -68,15 +68,7 @@ namespace RecruitRush
 
         void Update()
         {
-            var gm = GameManager.I;
-            float dt = Time.deltaTime;
-            age += dt;
-            if (gm)
-            {
-                Vector3 p = transform.position;
-                p.z -= gm.WorldSpeed * dt;
-                transform.position = p;
-            }
+            age += Time.deltaTime;
             // Quick spread, hold, then shrink out.
             float k = age < 0.12f ? Mathf.Lerp(0.4f, 1f, age / 0.12f) : age > Life - 0.5f ? Mathf.Clamp01((Life - age) / 0.5f) : 1f;
             transform.localScale = new Vector3(size.x * k, size.y, size.z * k);
