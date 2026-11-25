@@ -171,6 +171,13 @@ namespace RecruitRush
             pause.Show();
         }
 
+        /// <summary>Test hook (autoplay bot): open / close the pause card without the HUD button.</summary>
+        public void SetPausedForTest(bool open)
+        {
+            if (open) OpenPause();
+            else ClosePause();
+        }
+
         /// <summary>Lobby gear button: the pause card in settings mode (sound / vibration, CLOSE).</summary>
         void OpenSettings()
         {

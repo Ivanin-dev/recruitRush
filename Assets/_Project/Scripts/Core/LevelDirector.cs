@@ -169,8 +169,9 @@ namespace RecruitRush
                 leftBarricadeHp = 6f * (1f + k * 0.3f),
                 rightBarricadeHp = 30f * (1f + k * 0.3f),
                 turretHp = 120f * (1f + k * 0.35f),
-                bossHp = Mathf.Round(2500f * (1f + k * 0.35f) / 10f) * 10f,
-                bossKills = 2 + level / 2,
+                // Gentler start now that squads stay small; the DPS floor (BossSeconds) keeps strong squads honest later.
+                bossHp = Mathf.Round(1600f * (1f + k * 0.42f) / 10f) * 10f,
+                bossKills = 1 + level / 2,
             };
 
             c.type = TypeFor(level);

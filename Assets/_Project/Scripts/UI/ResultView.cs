@@ -29,7 +29,7 @@ namespace RecruitRush
     /// </summary>
     public class ResultView : MonoBehaviour
     {
-        RectTransform ribbonRoot, card, rewardRow, giftIcon, chestBonus, trackRoot;
+        RectTransform ribbonRoot, card, rewardRow, giftIcon, chestBonus, trackRoot, trackCard, tipCard;
         Image titleGlow;
         TitleText title;
         TextMeshProUGUI subtitle, survivorsText, killsText, rewardText, tipText, chestBonusText;
@@ -64,7 +64,7 @@ namespace RecruitRush
             dimR.anchorMin = new Vector2(-0.5f, -0.5f);
             dimR.anchorMax = new Vector2(1.5f, 1.5f);
             dim = dimR.gameObject.AddComponent<Image>();
-            dim.color = th.dim;
+            dim.color = LightDim; // like the lobby: the scene stays visible, the cards carry the contrast
 
             ribbonRoot = UiKit.Rect(r, "Ribbon", new Vector2(0.5f, 0.8f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(900f, 176f));
             // No plaque (it read as a button): the layered title floats on a soft colored glow.
@@ -75,21 +75,18 @@ namespace RecruitRush
             subtitle = UiKit.Label(ribbonRoot, "Subtitle", "", th.subtitle, th.textMuted);
             subtitle.rectTransform.anchoredPosition = new Vector2(0f, -140f);
 
-            // Card.
-            var cardSize = new Vector2(860f, 600f);
-            var cardBlock = UiKit.Lipped(r, "Card", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 40f), cardSize,
-                th.slateFace, th.slateLip, 6f, 36f, true, 0f); // panel: no rim, thin lip, inner stroke
-            card = cardBlock.root;
-            var c = cardBlock.face;
+            // Lobby style: no big panel, each piece is its own chunky lipped card (like the upgrade tiles) floating on
+            // the scene. The container only keeps the layout.
+            card = UiKit.Rect(r, "Cards", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 40f), new Vector2(860f, 600f));
+            var c = card;
 
             // Stats: two tiles, icon + number, no labels needed.
-            survivors = StatTile(c, new Vector2(-206f, -100f), Icon.Soldier, th.blue, out survivorsText);
-            kills = StatTile(c, new Vector2(206f, -100f), Icon.Skull, th.red, out killsText);
+            survivors = StatTile(c, new Vector2(-206f, -100f), Icon.Soldier, "SURVIVORS", out survivorsText);
+            kills = StatTile(c, new Vector2(206f, -100f), Icon.Skull, "KILLS", out killsText);
 
             // Reward: the emotional peak.
-            rewardRow = UiKit.Rect(c, "Reward", new Vector2(0.5f, 1f), new Vector2(0.5f, 0.5f), new Vector2(0f, -300f), new Vector2(700f, 150f));
-            UiKit.Well(rewardRow, th.slateTrack, th.cornerCard);
-            var rewardTag = UiKit.MakeCoinTag(rewardRow, 150f, th.rewardNumber, th.goldText);
+            rewardRow = Card(c, "Reward", new Vector2(0.5f, 1f), new Vector2(0f, -300f), new Vector2(820f, 150f), out var rewardFace);
+            var rewardTag = UiKit.MakeCoinTag(rewardFace, 150f, th.rewardNumber, th.goldText);
             rewardText = rewardTag.text;
             reward = rewardRow.gameObject.AddComponent<RollingCounter>();
             reward.text = rewardText;
@@ -99,6 +96,7 @@ namespace RecruitRush
             reward.punchScale = 1.12f;
 
             // Reward track.
+            trackCard = Card(c, "TrackCard", new Vector2(0.5f, 0f), new Vector2(0f, 92f), new Vector2(820f, 160f), out _);
             trackRoot = UiKit.Rect(c, "Track", new Vector2(0.5f, 0f), new Vector2(0.5f, 0.5f), new Vector2(-40f, 92f), new Vector2(620f, 120f));
             var cap = UiKit.Label(trackRoot, "Caption", "NEXT CHEST", th.caption, th.textMuted, TextAlignmentOptions.TopLeft);
             cap.rectTransform.offsetMin = new Vector2(0f, 0f);
@@ -108,6 +106,7 @@ namespace RecruitRush
             chestBonus = UiKit.Rect(trackRoot, "ChestBonus", new Vector2(1f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-10f, 66f), new Vector2(200f, 60f));
             chestBonusText = UiKit.Label(chestBonus, "Text", "+0", 54f, th.goldText);
 
+            tipCard = Card(c, "TipCard", new Vector2(0.5f, 0f), new Vector2(0f, 100f), new Vector2(820f, 180f), out _);
             tipText = UiKit.Label(c, "Tip", "", 38f, th.textMain);
             tipText.rectTransform.anchorMin = tipText.rectTransform.anchorMax = new Vector2(0.5f, 0f);
             tipText.rectTransform.sizeDelta = new Vector2(740f, 150f);
@@ -133,15 +132,35 @@ namespace RecruitRush
             gameObject.SetActive(false);
         }
 
-        RollingCounter StatTile(RectTransform parent, Vector2 pos, Icon icon, Color tint, out TextMeshProUGUI text)
+        static Color LightDim
+        {
+            get { var d = UiTheme.Current.dim; return new Color(d.r, d.g, d.b, 0.42f); }
+        }
+
+        /// <summary>
+        /// A lobby-style card: slate face, chunky lip, rounded like the upgrade tiles. Returns the positioned container
+        /// (hide / move that); content goes into <paramref name="face"/>.
+        /// </summary>
+        static RectTransform Card(RectTransform parent, string name, Vector2 anchor, Vector2 pos, Vector2 size, out RectTransform face)
         {
             var th = UiTheme.Current;
-            var tile = UiKit.Rect(parent, "Stat" + icon, new Vector2(0.5f, 1f), new Vector2(0.5f, 0.5f), pos, new Vector2(380f, 130f));
-            UiKit.Well(tile, th.slateTrack, th.cornerCard);
-            UiKit.Icon(tile, icon, new Vector2(0f, 0.5f), new Vector2(76f, 0f), 100f); // icons carry their own colors
+            var root = UiKit.Rect(parent, name, anchor, new Vector2(0.5f, 0.5f), pos, size);
+            face = UiKit.Lipped(root, "Block", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, size, th.slateFace, th.slateLip, 10f, th.cornerCard).face;
+            return root;
+        }
+
+        RollingCounter StatTile(RectTransform parent, Vector2 pos, Icon icon, string caption, out TextMeshProUGUI text)
+        {
+            var th = UiTheme.Current;
+            var root = Card(parent, "Stat" + icon, new Vector2(0.5f, 1f), pos, new Vector2(400f, 150f), out var tile);
+            // Header like an upgrade tile: muted caption top-left, icon, then the big number.
+            var cap = UiKit.Label(tile, "Caption", caption, th.typeS, th.textMuted, TextAlignmentOptions.TopLeft);
+            cap.rectTransform.offsetMin = new Vector2(24f, 0f);
+            cap.rectTransform.offsetMax = new Vector2(-20f, -14f);
+            UiKit.Icon(tile, icon, new Vector2(0f, 0.5f), new Vector2(70f, -14f), 84f); // icons carry their own colors
             text = UiKit.Label(tile, "Value", "0", th.statNumber, th.textMain, TextAlignmentOptions.MidlineRight);
-            text.rectTransform.offsetMax = new Vector2(-34f, 0f);
-            var rc = tile.gameObject.AddComponent<RollingCounter>();
+            text.rectTransform.offsetMax = new Vector2(-28f, -24f);
+            var rc = root.gameObject.AddComponent<RollingCounter>();
             rc.text = text;
             rc.punchTarget = text.transform;
             rc.punchScale = 1.15f;
@@ -182,11 +201,13 @@ namespace RecruitRush
             reward.Set(0, true);
 
             trackRoot.gameObject.SetActive(win);
+            trackCard.gameObject.SetActive(win);
             track.Set(result.trackFrom, true);
             chestBonus.gameObject.SetActive(false);
             giftIcon.localScale = Vector3.one;
 
             tipText.gameObject.SetActive(!win && !string.IsNullOrEmpty(result.tip));
+            tipCard.gameObject.SetActive(tipText.gameObject.activeSelf);
             tipText.text = result.tip;
 
             collect.label.text = win ? "COLLECT" : "RETRY";

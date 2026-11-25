@@ -12,7 +12,7 @@ namespace RecruitRush
         GameManager gm;
         string dir;
         float t, endT = -1f, bossT = -1f;
-        bool shotStart, shot1, shot2, shot3, shotBoss, shotEnd;
+        bool shotStart, shot1, shot2, shot3, shotBoss, shotEnd, shotPause;
 
         void Start()
         {
@@ -41,6 +41,7 @@ namespace RecruitRush
             if (gm.Current == GameManager.State.Playing)
             {
                 gm.Squad.SetTargetX(ChooseX());
+                if (!shotPause && t > 3.5f) { shotPause = true; StartCoroutine(PauseShot()); }
                 if (!shot1 && t > 6f) { shot1 = true; Shot("1_early"); }
                 if (!shot2 && t > 18f) { shot2 = true; Shot("2_mid"); }
                 if (!shot3 && gm.Director.FinalPhase && gm.Boss == null) { shot3 = true; Shot("3_final_wave"); }
@@ -115,6 +116,16 @@ namespace RecruitRush
             if (crate && closeEnemies < 3) return LevelDirector.RightX;
             if (nearEnemies >= 3) return enemyX / nearEnemies;
             return LevelDirector.LeftX;
+        }
+
+        // Game time stops while paused, so this runs on real time.
+        System.Collections.IEnumerator PauseShot()
+        {
+            gm.UI.SetPausedForTest(true);
+            yield return new WaitForSecondsRealtime(0.8f);
+            Shot("1b_pause");
+            yield return new WaitForSecondsRealtime(0.3f);
+            gm.UI.SetPausedForTest(false);
         }
 
         void Shot(string name)
