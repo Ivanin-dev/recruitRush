@@ -214,6 +214,9 @@ namespace RecruitRush
             float t = 0f;
             void Add(SegmentKind kind, float len, int count = 0, WaveMix mix = WaveMix.Rush, float pressure = 0f)
             {
+                // The march already warms the player up: a short trickle and tighter windows keep the whole level brisk.
+                if (kind == SegmentKind.Trickle) len *= 0.5f;
+                else if (kind == SegmentKind.Window) len *= 0.8f;
                 c.segments.Add(new Segment
                 {
                     kind = kind, start = t, end = t + len, count = Mathf.Max(4, count), mix = mix,

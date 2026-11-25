@@ -119,7 +119,7 @@ namespace RecruitRush
             if (StartBanner != null)
             {
                 var th = UiTheme.Current;
-                UI.ShowBanner(StartBanner, Unlocks.NewAt(Level) != null ? th.gold : th.red);
+                UI.ShowBanner(StartBanner, Level == 1 ? th.blue : Unlocks.NewAt(Level) != null ? th.gold : th.red);
             }
         }
 
@@ -127,7 +127,7 @@ namespace RecruitRush
         string LevelCaption => Unlocks.NewAt(Level) ?? (Level >= 3 ? Config.Tag : null);
 
         /// <summary>Start-of-run banner: only news (an unlock) or an elite warning; the scenario tag lives under PLAY.</summary>
-        string StartBanner => Unlocks.NewAt(Level) ?? (Config.beat == LevelBeat.Elite ? Config.Tag : null);
+        string StartBanner => Level == 1 ? "SWIPE TO STEER" : Unlocks.NewAt(Level) ?? (Config.beat == LevelBeat.Elite ? Config.Tag : null);
 
         int StartCount => Config.startCount + MetaProgress.BonusSoldiers;
 

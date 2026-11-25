@@ -206,16 +206,34 @@ namespace RecruitRush
                 }
                 else
                 {
-                    Color face = done ? th.green : th.slateFace, lip = done ? th.greenDark : th.slateLip;
+                    bool elite = !done && n >= 5 && n % 5 == 0;
+                    Color face = done ? th.green : elite ? th.red : th.slateFace, lip = done ? th.greenDark : elite ? th.redDark : th.slateLip;
                     var node = UiKit.Lipped(road, done ? "Done" : "Next", new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(x, 3f),
                         new Vector2(60f, 60f), face, lip, 5f, 30f, false, done ? -1f : 0f);
-                    var t = UiKit.Label(node.face, "N", n.ToString(), th.typeS, done ? th.textMain : th.textMuted);
-                    if (done) UiKit.InkLabel(t, lip);
+                    var t = UiKit.Label(node.face, "N", n.ToString(), th.typeS, done || elite ? th.textMain : th.textMuted);
+                    if (done || elite) UiKit.InkLabel(t, lip);
                 }
+                if (!done) RoadBadges(n, x, current ? 62f : 46f);
             }
 
             int d = (MetaProgress.RewardEvery - level % MetaProgress.RewardEvery) % MetaProgress.RewardEvery;
             chestText.text = d == 0 ? "BEAT THIS LEVEL TO OPEN THE CHEST" : "CHEST IN " + (d + 1);
+        }
+
+        /// <summary>Upcoming-level markers on the road: a gold NEW over unlock levels, a skull over elite ones.</summary>
+        void RoadBadges(int n, float x, float y)
+        {
+            var th = UiTheme.Current;
+            if (Unlocks.NewAt(n) != null)
+            {
+                var tag = UiKit.Label(road, "New", "NEW", th.typeS - 6f, th.goldText);
+                tag.rectTransform.anchorMin = tag.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
+                tag.rectTransform.sizeDelta = new Vector2(120f, 40f);
+                tag.rectTransform.anchoredPosition = new Vector2(x, y + 4f);
+                UiKit.InkLabel(tag, th.goldDark);
+                y += 38f;
+            }
+            if (n >= 5 && n % 5 == 0) UiKit.Icon(road, Icon.Skull, new Vector2(0.5f, 0.5f), new Vector2(x, y + 14f), 40f);
         }
 
         // ---------------- Show / hide ----------------
