@@ -72,7 +72,6 @@ namespace RecruitRush
     ///   [icon]  SQUAD           (•) ← red dot when affordable
     ///           Lv.7
     ///        +1 SOLDIER          ← what the next level gives
-    ///   [====saving====]         ← only while saving up: coins / price
     ///   [ coin  1.2K ]           ← price strip: green = buy, slate = saving, gold = MAX
     /// No glow halos or wells: state is read from the price color and the dot.
     /// </summary>
@@ -169,9 +168,7 @@ namespace RecruitRush
             this.price.icon.color = affordable ? Color.white : new Color(0.75f, 0.78f, 0.88f, 1f);
             UiKit.InkLabel(this.price.text, lip);
 
-            bool savingUp = !affordable && !maxed;
-            saving.gameObject.SetActive(savingUp);
-            if (savingUp) saving.Set(price > 0 ? coins / (float)price : 0f, true);
+            saving.gameObject.SetActive(false); // no saving-up bar: the price strip color alone says buy / not yet
 
             bool becameAffordable = affordable && !wasAffordable;
             dot.gameObject.SetActive(affordable);
